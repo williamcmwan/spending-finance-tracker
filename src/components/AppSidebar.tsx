@@ -9,11 +9,13 @@ import {
   TrendingUp,
   Calculator,
   FileText,
+  LogOut,
 } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -23,6 +25,9 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -37,6 +42,19 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
+  const { signOut, user } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive"
+      });
+    }
+  };
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
@@ -78,6 +96,24 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <div className="p-2">
+          {user && !collapsed && (
+            <div className="mb-3 text-sm text-muted-foreground truncate">
+              {user.email}
+            </div>
+          )}
+          <Button 
+            variant="outline" 
+            className={collapsed ? "w-10 h-10 p-0" : "w-full justify-start"} 
+            onClick={handleSignOut}
+            title="Sign Out"
+          >
+            <LogOut className={collapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+            {!collapsed && "Sign Out"}
+          </Button>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
