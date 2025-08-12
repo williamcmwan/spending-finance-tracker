@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardLayout } from "./components/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
+import Analytics from "./pages/Analytics";
 import Categories from "./pages/Categories";
 import Import from "./pages/Import";
 import NotFound from "./pages/NotFound";
@@ -22,6 +23,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/import" element={<Import />} />
             <Route path="*" element={<NotFound />} />
