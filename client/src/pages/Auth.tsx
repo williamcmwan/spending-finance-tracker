@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Chrome, ArrowRight, Shield, TrendingUp, PieChart } from 'lucide-react';
 
 const Auth = () => {
-  const { user, loading, signInWithGoogle, signUp, signIn } = useAuth();
+  const { user, loading, loginWithGoogle, register, login } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,9 +27,9 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    const { error } = await signInWithGoogle();
-    
-    if (error) {
+    try {
+      loginWithGoogle();
+    } catch (error: any) {
       toast({
         title: "Authentication Error",
         description: error.message,
@@ -43,9 +43,9 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signIn(formData.email, formData.password);
-    
-    if (error) {
+    try {
+      await login(formData.email, formData.password);
+    } catch (error: any) {
       toast({
         title: "Sign In Error",
         description: error.message,
@@ -68,18 +68,17 @@ const Auth = () => {
     }
     
     setIsLoading(true);
-    const { error } = await signUp(formData.email, formData.password);
-    
-    if (error) {
+    try {
+      await register(formData.email, formData.password, formData.email.split('@')[0]); // Use email prefix as name
+      toast({
+        title: "Success!",
+        description: "Account created successfully",
+      });
+    } catch (error: any) {
       toast({
         title: "Sign Up Error",
         description: error.message,
         variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Success!",
-        description: "Check your email to confirm your account",
       });
     }
     setIsLoading(false);

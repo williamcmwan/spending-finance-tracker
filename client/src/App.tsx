@@ -12,6 +12,7 @@ import Analytics from "./pages/Analytics";
 import Categories from "./pages/Categories";
 import Import from "./pages/Import";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/*" element={
               <ProtectedRoute>
                 <DashboardLayout>
