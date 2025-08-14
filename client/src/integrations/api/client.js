@@ -34,6 +34,11 @@ class ApiClient {
       ...options,
     };
 
+    // Don't set Content-Type for FormData (let browser set it)
+    if (options.body instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     try {
       const response = await fetch(url, config);
       

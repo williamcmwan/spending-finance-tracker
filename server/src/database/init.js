@@ -94,16 +94,16 @@ function seedDefaultData() {
 
     if (row.count === 0) {
       const defaultCategories = [
-        { name: 'Food & Dining', color: '#EF4444', icon: 'utensils' },
+        { name: 'Food & dining', color: '#EF4444', icon: 'utensils' },
         { name: 'Transportation', color: '#3B82F6', icon: 'car' },
         { name: 'Shopping', color: '#8B5CF6', icon: 'shopping-bag' },
-        { name: 'Entertainment', color: '#EC4899', icon: 'film' },
-        { name: 'Healthcare', color: '#10B981', icon: 'heart' },
-        { name: 'Utilities', color: '#F59E0B', icon: 'zap' },
-        { name: 'Housing', color: '#6366F1', icon: 'home' },
-        { name: 'Education', color: '#06B6D4', icon: 'book' },
+        { name: 'Entertainment', color: '#F59E0B', icon: 'film' },
+        { name: 'Healthcare', color: '#EF4444', icon: 'heart' },
+        { name: 'Utilities', color: '#10B981', icon: 'zap' },
+        { name: 'Housing', color: '#059669', icon: 'home' },
+        { name: 'Education', color: '#3B82F6', icon: 'graduation-cap' },
         { name: 'Salary', color: '#10B981', icon: 'dollar-sign' },
-        { name: 'Freelance', color: '#8B5CF6', icon: 'briefcase' },
+        { name: 'Freelance', color: '#3B82F6', icon: 'briefcase' },
         { name: 'Investment', color: '#F59E0B', icon: 'trending-up' },
         { name: 'Other', color: '#6B7280', icon: 'more-horizontal' }
       ];

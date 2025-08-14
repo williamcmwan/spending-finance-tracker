@@ -25,7 +25,7 @@ const authenticateToken = (req, res, next) => {
 // Get all transactions for user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, type, category_id, start_date, end_date } = req.query;
+    const { page = 1, limit = 20, type, category_id, start_date, end_date, description, amount, sort_field = 'date', sort_direction = 'desc' } = req.query;
     const offset = (page - 1) * limit;
     
     let whereClause = 'WHERE t.user_id = ?';
@@ -51,6 +51,131 @@ router.get('/', authenticateToken, async (req, res) => {
       params.push(end_date);
     }
 
+    // Add date search functionality
+    if (req.query.date_search) {
+      const dateSearch = req.query.date_search;
+      
+      // Support various date formats and partial matches
+      if (dateSearch.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
+        // Full date format: YYYY-MM-DD
+        whereClause += ' AND DATE(t.date) = DATE(?)';
+        params.push(dateSearch);
+      } else if (dateSearch.match(/^\d{4}-\d{1,2}$/)) {
+        // Year-Month format: YYYY-MM
+        const [year, month] = dateSearch.split('-');
+        whereClause += ' AND strftime("%Y", t.date) = ? AND strftime("%m", t.date) = ?';
+        params.push(year, month.padStart(2, '0'));
+      } else if (dateSearch.match(/^\d{1,2}-\d{1,2}$/)) {
+        // Month-Day format: MM-DD
+        const [month, day] = dateSearch.split('-');
+        whereClause += ' AND strftime("%m", t.date) = ? AND strftime("%d", t.date) = ?';
+        params.push(month.padStart(2, '0'), day.padStart(2, '0'));
+      } else if (dateSearch.includes('/') || dateSearch.includes('.')) {
+        // Try to parse as date with other separators
+        const searchDate = new Date(dateSearch);
+        if (!isNaN(searchDate.getTime())) {
+          whereClause += ' AND DATE(t.date) = DATE(?)';
+          params.push(searchDate.toISOString().split('T')[0]);
+        }
+      } else if (dateSearch.match(/^\d{4}$/)) {
+        // Year search
+        whereClause += ' AND strftime("%Y", t.date) = ?';
+        params.push(dateSearch);
+      } else if (dateSearch.match(/^\d{1,2}$/)) {
+        // Month or day search (1-12 for months, 1-31 for days)
+        const num = parseInt(dateSearch);
+        if (num >= 1 && num <= 12) {
+          // Likely a month
+          whereClause += ' AND strftime("%m", t.date) = ?';
+          params.push(dateSearch.padStart(2, '0'));
+        } else if (num >= 1 && num <= 31) {
+          // Likely a day
+          whereClause += ' AND strftime("%d", t.date) = ?';
+          params.push(dateSearch.padStart(2, '0'));
+        }
+      } else if (dateSearch.match(/^\d{3}$/)) {
+        // Partial year search (e.g., "202" for 2020, 2021, 2022, etc.)
+        whereClause += ' AND strftime("%Y", t.date) LIKE ?';
+        params.push(`${dateSearch}%`);
+      } else if (dateSearch.match(/^[a-zA-Z]+$/)) {
+        // Month name search (e.g., "jan", "january", "feb", etc.)
+        const monthNames = {
+          'jan': '01', 'january': '01',
+          'feb': '02', 'february': '02',
+          'mar': '03', 'march': '03',
+          'apr': '04', 'april': '04',
+          'may': '05',
+          'jun': '06', 'june': '06',
+          'jul': '07', 'july': '07',
+          'aug': '08', 'august': '08',
+          'sep': '09', 'september': '09',
+          'oct': '10', 'october': '10',
+          'nov': '11', 'november': '11',
+          'dec': '12', 'december': '12'
+        };
+        const monthNum = monthNames[dateSearch.toLowerCase()];
+        if (monthNum) {
+          whereClause += ' AND strftime("%m", t.date) = ?';
+          params.push(monthNum);
+        }
+      } else if (dateSearch.match(/^\d+$/)) {
+        // Any other numeric input - search in date string format
+        whereClause += ' AND strftime("%Y-%m-%d", t.date) LIKE ?';
+        params.push(`%${dateSearch}%`);
+      }
+    }
+
+    if (description) {
+      whereClause += ' AND (t.description LIKE ? OR c.name LIKE ?)';
+      params.push(`%${description}%`, `%${description}%`);
+    }
+
+    if (amount) {
+      // Support both exact amount and amount range searching
+      if (amount.includes('-')) {
+        const [minAmount, maxAmount] = amount.split('-').map(a => parseFloat(a.trim()));
+        if (!isNaN(minAmount)) {
+          whereClause += ' AND t.amount >= ?';
+          params.push(minAmount);
+        }
+        if (!isNaN(maxAmount)) {
+          whereClause += ' AND t.amount <= ?';
+          params.push(maxAmount);
+        }
+      } else {
+        // Try to parse as exact amount first
+        const exactAmount = parseFloat(amount);
+        if (!isNaN(exactAmount)) {
+          whereClause += ' AND t.amount = ?';
+          params.push(exactAmount);
+        } else {
+          // If not a number, search for amount as text (for partial matches)
+          whereClause += ' AND CAST(t.amount AS TEXT) LIKE ?';
+          params.push(`%${amount}%`);
+        }
+      }
+    }
+
+    // Build ORDER BY clause
+    let orderByClause = 'ORDER BY ';
+    const validSortFields = ['date', 'description', 'amount', 'type', 'category'];
+    const validSortDirections = ['asc', 'desc'];
+    
+    if (validSortFields.includes(sort_field) && validSortDirections.includes(sort_direction)) {
+      if (sort_field === 'category') {
+        orderByClause += `c.name COLLATE NOCASE ${sort_direction.toUpperCase()}`;
+      } else if (sort_field === 'description') {
+        orderByClause += `t.description COLLATE NOCASE ${sort_direction.toUpperCase()}`;
+      } else if (sort_field === 'type') {
+        orderByClause += `t.type COLLATE NOCASE ${sort_direction.toUpperCase()}`;
+      } else {
+        orderByClause += `t.${sort_field} ${sort_direction.toUpperCase()}`;
+      }
+    } else {
+      // Default sorting
+      orderByClause += 't.date DESC';
+    }
+    
     const sql = `
       SELECT 
         t.*,
@@ -60,14 +185,21 @@ router.get('/', authenticateToken, async (req, res) => {
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
       ${whereClause}
-      ORDER BY t.date DESC, t.created_at DESC
+      ${orderByClause}
       LIMIT ? OFFSET ?
     `;
 
     const transactions = await getRows(sql, [...params, parseInt(limit), offset]);
     
     // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM transactions t ${whereClause}`;
+    let countSql;
+    if (description) {
+      // If searching by description (which includes category), need to include the JOIN
+      countSql = `SELECT COUNT(*) as total FROM transactions t LEFT JOIN categories c ON t.category_id = c.id ${whereClause}`;
+    } else {
+      // Otherwise, just count from transactions table
+      countSql = `SELECT COUNT(*) as total FROM transactions t ${whereClause}`;
+    }
     const countResult = await getRow(countSql, params);
     const total = countResult.total;
 

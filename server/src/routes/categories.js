@@ -23,9 +23,12 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Get all categories
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const categories = await getRows('SELECT * FROM categories ORDER BY name');
+    const categories = await getRows(
+      'SELECT * FROM categories WHERE user_id = ? OR user_id IS NULL ORDER BY name',
+      [req.user.userId]
+    );
     res.json({ categories });
   } catch (error) {
     console.error('Get categories error:', error);
@@ -34,11 +37,14 @@ router.get('/', async (req, res) => {
 });
 
 // Get single category
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const category = await getRow('SELECT * FROM categories WHERE id = ?', [id]);
+    const category = await getRow(
+      'SELECT * FROM categories WHERE id = ? AND (user_id = ? OR user_id IS NULL)',
+      [id, req.user.userId]
+    );
 
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
@@ -50,6 +56,12 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Function to capitalize first letter of a string
+const capitalizeFirstLetter = (string) => {
+  if (!string || typeof string !== 'string') return string;
+  return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+};
 
 // Create category (admin only for now, since we're using default categories)
 router.post('/', [
@@ -65,16 +77,17 @@ router.post('/', [
     }
 
     const { name, color = '#3B82F6', icon = 'tag' } = req.body;
+    const capitalizedName = capitalizeFirstLetter(name);
 
     // Check if category already exists
-    const existingCategory = await getRow('SELECT * FROM categories WHERE name = ?', [name]);
+    const existingCategory = await getRow('SELECT * FROM categories WHERE name = ?', [capitalizedName]);
     if (existingCategory) {
       return res.status(400).json({ error: 'Category already exists' });
     }
 
     const result = await runQuery(
       'INSERT INTO categories (name, color, icon, user_id) VALUES (?, ?, ?, ?)',
-      [name, color, icon, req.user.userId]
+      [capitalizedName, color, icon, req.user.userId]
     );
 
     const category = await getRow('SELECT * FROM categories WHERE id = ?', [result.id]);
@@ -117,7 +130,7 @@ router.put('/:id', [
 
     if (name !== undefined) {
       updates.push('name = ?');
-      params.push(name);
+      params.push(capitalizeFirstLetter(name));
     }
     if (color !== undefined) {
       updates.push('color = ?');
