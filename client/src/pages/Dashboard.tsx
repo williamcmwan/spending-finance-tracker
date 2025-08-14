@@ -681,18 +681,17 @@ export default function Dashboard() {
               <div className="text-muted-foreground">No transactions found for this period</div>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="h-10">
-                    <TableHead className="w-20">Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="w-32">Category</TableHead>
-                    <TableHead className="w-24">Source</TableHead>
-                    <TableHead className="w-20">Type</TableHead>
-                    <TableHead className="w-24 text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
+            <Table>
+              <TableHeader>
+                <TableRow className="h-10">
+                  <TableHead className="w-20">Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-32">Category</TableHead>
+                  <TableHead className="w-24">Source</TableHead>
+                  <TableHead className="w-20">Type</TableHead>
+                  <TableHead className="w-24 text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
                 <TableBody>
                   {allTransactions.map((transaction, index) => {
                     const isLast = index === allTransactions.length - 1;
@@ -766,7 +765,6 @@ export default function Dashboard() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>
