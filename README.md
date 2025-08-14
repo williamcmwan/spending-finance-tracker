@@ -1,6 +1,6 @@
 # Spending Finance Tracker
 
-A modern, full-stack finance tracking application built with React, TypeScript, Express.js, and SQLite. Track your spending, categorize transactions, and gain insights into your financial habits.
+A modern, full-stack finance tracking application built with React, TypeScript, Express.js, and SQLite. Track your spending, categorize transactions, and gain insights into your financial habits with an intuitive drag-and-drop import system and comprehensive category management.
 
 ## 🏗️ Project Structure
 
@@ -103,14 +103,17 @@ npm run dev
 
 ### Transaction Management
 - ✅ Create, read, update, delete transactions
-- ✅ Categorize transactions
+- ✅ Categorize transactions with meaningful colors and icons
 - ✅ Filter and search transactions
 - ✅ Date-based organization
+- ✅ Bulk import with CSV drag-and-drop support
 
 ### Categories
-- ✅ Custom category creation
-- ✅ Category color and icon customization
-- ✅ Default categories included
+- ✅ Custom category creation with 80+ icon options
+- ✅ Intelligent color assignment based on category type
+- ✅ Automatic category name capitalization
+- ✅ Duplicate category detection and merging
+- ✅ Default categories with optimized colors and icons
 
 ### Analytics
 - ✅ Spending summary dashboard
@@ -118,11 +121,21 @@ npm run dev
 - ✅ Monthly spending trends
 - ✅ Income vs expense tracking
 
+### Import System
+- ✅ Drag-and-drop CSV file upload
+- ✅ Visual feedback during file operations
+- ✅ Automatic file type validation
+- ✅ Transaction validation and preview
+- ✅ Bulk import with selective transaction import
+- ✅ Template download for proper CSV formatting
+
 ### User Experience
-- ✅ Responsive design
+- ✅ Responsive design with modern UI components
 - ✅ Dark/light mode support
 - ✅ Mobile-friendly interface
 - ✅ Real-time data updates
+- ✅ Smooth animations and transitions
+- ✅ Intuitive category color coding
 
 ## 🚀 Deployment
 

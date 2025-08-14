@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Spending Finance Tracker Setup Script
-# This script sets up the development environment
+# This script sets up the development environment with enhanced category management and import functionality
 
 set -e  # Exit on any error
 

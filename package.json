@@ -1,7 +1,7 @@
 {
   "name": "spending-finance-tracker",
   "version": "1.0.0",
-  "description": "A modern, full-stack finance tracking application",
+  "description": "A modern, full-stack finance tracking application with drag-and-drop import and intelligent category management",
   "private": true,
   "workspaces": [
     "client",
@@ -39,9 +39,13 @@
     "tracker",
     "react",
     "typescript",
-    "supabase",
     "express",
-    "fullstack"
+    "sqlite",
+    "fullstack",
+    "drag-drop",
+    "import",
+    "categories",
+    "analytics"
   ],
   "author": "Your Name",
   "license": "MIT",

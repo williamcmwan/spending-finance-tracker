@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying the Spending Finance Tracker application to production.
+This guide covers deploying the Spending Finance Tracker application to production with comprehensive category management and drag-and-drop import functionality.
 
 ## Quick Start
 
