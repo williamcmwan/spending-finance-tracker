@@ -36,17 +36,61 @@ async function migrateCategoryNames() {
   }
 }
 
-// Run migration if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  migrateCategoryNames()
-    .then(() => {
-      console.log('Migration completed successfully');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('Migration failed:', error);
-      process.exit(1);
-    });
+// Migration to add source field to transactions table
+async function migrateAddSourceField() {
+  try {
+    console.log('Starting source field migration...');
+
+    // Check if source column already exists
+    const tableInfo = await getRows("PRAGMA table_info(transactions)");
+    const sourceColumnExists = tableInfo.some(col => col.name === 'source');
+    
+    if (sourceColumnExists) {
+      console.log('Source column already exists, skipping migration.');
+      return 0;
+    }
+
+    // Add source column
+    await runQuery('ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT "Manual Entry"');
+    console.log('Added source column to transactions table');
+
+    // Update existing transactions to have a default source
+    const result = await runQuery('UPDATE transactions SET source = "Manual Entry" WHERE source IS NULL');
+    console.log(`Updated ${result.changes} existing transactions with default source`);
+
+    console.log('Source field migration completed successfully.');
+    return result.changes;
+  } catch (error) {
+    console.error('Source field migration failed:', error);
+    throw error;
+  }
 }
 
-export { migrateCategoryNames };
+// Run migration if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const migrationType = process.argv[2];
+  
+  if (migrationType === 'source') {
+    migrateAddSourceField()
+      .then(() => {
+        console.log('Source field migration completed successfully');
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('Source field migration failed:', error);
+        process.exit(1);
+      });
+  } else {
+    migrateCategoryNames()
+      .then(() => {
+        console.log('Category name migration completed successfully');
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('Category name migration failed:', error);
+        process.exit(1);
+      });
+  }
+}
+
+export { migrateCategoryNames, migrateAddSourceField };

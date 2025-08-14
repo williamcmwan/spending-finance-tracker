@@ -25,7 +25,7 @@ const authenticateToken = (req, res, next) => {
 // Get all transactions for user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, type, category_id, start_date, end_date, description, amount, sort_field = 'date', sort_direction = 'desc' } = req.query;
+    const { page = 1, limit = 20, type, category_id, start_date, end_date, description, amount, source, sort_field = 'date', sort_direction = 'desc' } = req.query;
     const offset = (page - 1) * limit;
     
     let whereClause = 'WHERE t.user_id = ?';
@@ -39,6 +39,11 @@ router.get('/', authenticateToken, async (req, res) => {
     if (category_id) {
       whereClause += ' AND t.category_id = ?';
       params.push(category_id);
+    }
+
+    if (source) {
+      whereClause += ' AND t.source LIKE ?';
+      params.push(`%${source}%`);
     }
 
     if (start_date) {
@@ -126,8 +131,8 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     if (description) {
-      whereClause += ' AND (t.description LIKE ? OR c.name LIKE ?)';
-      params.push(`%${description}%`, `%${description}%`);
+      whereClause += ' AND (t.description LIKE ? OR c.name LIKE ? OR t.source LIKE ?)';
+      params.push(`%${description}%`, `%${description}%`, `%${description}%`);
     }
 
     if (amount) {
@@ -158,7 +163,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     // Build ORDER BY clause
     let orderByClause = 'ORDER BY ';
-    const validSortFields = ['date', 'description', 'amount', 'type', 'category'];
+    const validSortFields = ['date', 'description', 'amount', 'type', 'category', 'source'];
     const validSortDirections = ['asc', 'desc'];
     
     if (validSortFields.includes(sort_field) && validSortDirections.includes(sort_direction)) {
@@ -168,6 +173,8 @@ router.get('/', authenticateToken, async (req, res) => {
         orderByClause += `t.description COLLATE NOCASE ${sort_direction.toUpperCase()}`;
       } else if (sort_field === 'type') {
         orderByClause += `t.type COLLATE NOCASE ${sort_direction.toUpperCase()}`;
+      } else if (sort_field === 'source') {
+        orderByClause += `t.source COLLATE NOCASE ${sort_direction.toUpperCase()}`;
       } else {
         orderByClause += `t.${sort_field} ${sort_direction.toUpperCase()}`;
       }
@@ -193,8 +200,8 @@ router.get('/', authenticateToken, async (req, res) => {
     
     // Get total count
     let countSql;
-    if (description) {
-      // If searching by description (which includes category), need to include the JOIN
+    if (description || source) {
+      // If searching by description (which includes category and source) or source, need to include the JOIN
       countSql = `SELECT COUNT(*) as total FROM transactions t LEFT JOIN categories c ON t.category_id = c.id ${whereClause}`;
     } else {
       // Otherwise, just count from transactions table
@@ -252,7 +259,8 @@ router.post('/', [
   body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be a positive number'),
   body('type').isIn(['income', 'expense']).withMessage('Type must be income or expense'),
   body('date').isISO8601().withMessage('Date must be a valid date'),
-  body('category_id').optional().isInt().withMessage('Category ID must be a number')
+  body('category_id').optional().isInt().withMessage('Category ID must be a number'),
+  body('source').optional().isString().withMessage('Source must be a string')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -260,7 +268,7 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { description, amount, type, category_id, date } = req.body;
+    const { description, amount, type, category_id, date, source = 'Manual Entry' } = req.body;
 
     // Verify category exists if provided
     if (category_id) {
@@ -271,9 +279,9 @@ router.post('/', [
     }
 
     const result = await runQuery(`
-      INSERT INTO transactions (description, amount, type, category_id, user_id, date)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [description, amount, type, category_id, req.user.userId, date]);
+      INSERT INTO transactions (description, amount, type, category_id, user_id, date, source)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [description, amount, type, category_id, req.user.userId, date, source]);
 
     const transaction = await getRow(`
       SELECT 
@@ -303,7 +311,8 @@ router.put('/:id', [
   body('amount').optional().isFloat({ min: 0.01 }).withMessage('Amount must be a positive number'),
   body('type').optional().isIn(['income', 'expense']).withMessage('Type must be income or expense'),
   body('date').optional().isISO8601().withMessage('Date must be a valid date'),
-  body('category_id').optional().isInt().withMessage('Category ID must be a number')
+  body('category_id').optional().isInt().withMessage('Category ID must be a number'),
+  body('source').optional().isString().withMessage('Source must be a string')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -312,7 +321,7 @@ router.put('/:id', [
     }
 
     const { id } = req.params;
-    const { description, amount, type, category_id, date } = req.body;
+    const { description, amount, type, category_id, date, source } = req.body;
 
     // Check if transaction exists and belongs to user
     const existingTransaction = await getRow(
@@ -355,6 +364,10 @@ router.put('/:id', [
     if (date !== undefined) {
       updates.push('date = ?');
       params.push(date);
+    }
+    if (source !== undefined) {
+      updates.push('source = ?');
+      params.push(source);
     }
 
     if (updates.length === 0) {

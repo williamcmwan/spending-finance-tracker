@@ -103,25 +103,38 @@ npm run dev
 
 ### Transaction Management
 - ✅ Create, read, update, delete transactions
+- ✅ **Inline editing** for transaction fields (description, date, source)
 - ✅ Categorize transactions with meaningful colors and icons
-- ✅ Filter and search transactions
-- ✅ Date-based organization
+- ✅ **Source field tracking** (bank names, import sources)
+- ✅ Filter and search transactions by multiple criteria
+- ✅ Date-based organization with flexible date ranges
 - ✅ Bulk import with CSV drag-and-drop support
+- ✅ **Lazy loading** for large transaction lists (performance optimized)
+
+### Dashboard & Analytics
+- ✅ **Enhanced dashboard** with comprehensive financial overview
+- ✅ **Flexible date range picker** with calendar interface
+- ✅ **Quick date presets**: This Month, Last Month, Last 3/6/12 Months, This Year
+- ✅ **Category icons** displayed in transaction lists
+- ✅ **Real-time summary cards**: Income, Spending, Net Income, Savings Rate
+- ✅ **Lazy-loaded transaction list** with scroll-based pagination
+- ✅ Category-wise spending breakdown
+- ✅ Monthly spending trends
+- ✅ Income vs expense tracking
 
 ### Categories
 - ✅ Custom category creation with 80+ icon options
+- ✅ **Category icons** with color-coordinated display
 - ✅ Intelligent color assignment based on category type
 - ✅ Automatic category name capitalization
 - ✅ Duplicate category detection and merging
 - ✅ Default categories with optimized colors and icons
 
-### Analytics
-- ✅ Spending summary dashboard
-- ✅ Category-wise spending breakdown
-- ✅ Monthly spending trends
-- ✅ Income vs expense tracking
-
-### Import System
+### Data Management
+- ✅ **Source field database migration** with automatic updates
+- ✅ **CSV data matching** for source field population
+- ✅ **Database optimization** for large datasets
+- ✅ **Unlimited transaction loading** (removed artificial limits)
 - ✅ Drag-and-drop CSV file upload
 - ✅ Visual feedback during file operations
 - ✅ Automatic file type validation
@@ -130,12 +143,24 @@ npm run dev
 - ✅ Template download for proper CSV formatting
 
 ### User Experience
+- ✅ **Modern popover components** with proper z-index management
+- ✅ **Intersection Observer** for smooth lazy loading
+- ✅ **Inline editing** with keyboard shortcuts (Enter/Escape)
+- ✅ **Calendar date picker** with 2-month view
+- ✅ **Quick date selection** dropdown menu
 - ✅ Responsive design with modern UI components
 - ✅ Dark/light mode support
 - ✅ Mobile-friendly interface
 - ✅ Real-time data updates
 - ✅ Smooth animations and transitions
 - ✅ Intuitive category color coding
+
+### Performance Optimizations
+- ✅ **Lazy loading** for transaction lists (50 transactions per batch)
+- ✅ **Intersection Observer** for automatic scroll-based loading
+- ✅ **Separated data fetching** (summary vs. display data)
+- ✅ **Memory-efficient rendering** for large datasets
+- ✅ **Progressive data loading** to avoid UI blocking
 
 ## 🚀 Deployment
 
@@ -216,10 +241,17 @@ DATABASE_PATH=./data/spending.db
 The application uses SQLite for data storage with the following schema:
 
 - **users** - User accounts and authentication
-- **categories** - Transaction categories
-- **transactions** - Financial transactions
+- **categories** - Transaction categories with icons and colors
+- **transactions** - Financial transactions with source field tracking
 
-The database is automatically initialized when you run the setup script.
+### Database Features
+- ✅ **Automatic migrations** for schema updates
+- ✅ **Source field** for tracking transaction origins (banks, import sources)
+- ✅ **Category icons** with 80+ icon options
+- ✅ **Optimized indexing** for fast queries on large datasets
+- ✅ **Data integrity** with foreign key constraints
+
+The database is automatically initialized when you run the setup script. Migrations are applied automatically when needed.
 
 ## 🔒 Security Features
 
@@ -250,6 +282,37 @@ If you encounter any issues:
 2. Review the console logs
 3. Verify environment variables
 4. Check the health endpoint: `http://localhost:3001/health`
+
+## 🆕 Recent Updates
+
+### Version 2.0.0 - Major Feature Release
+
+#### 🎯 **Enhanced Dashboard Experience**
+- **Flexible Date Ranges**: Calendar-based date picker with custom range selection
+- **Quick Date Presets**: One-click access to common periods (This Month, Last 3/6/12 Months, etc.)
+- **Lazy Loading**: Performance-optimized transaction loading with scroll-based pagination
+- **Category Icons**: Visual category identification with color-coordinated icons
+
+#### 💾 **Database Improvements**
+- **Source Field Migration**: Automatic database updates with CSV data matching
+- **Unlimited Transactions**: Removed artificial limits for large datasets
+- **Performance Optimization**: Enhanced indexing and query optimization
+
+#### ⚡ **Performance Enhancements**
+- **Intersection Observer**: Smooth scroll-based lazy loading
+- **Memory Management**: Progressive data loading to prevent UI blocking
+- **Separated Data Fetching**: Optimized summary vs. display data loading
+
+#### 🎨 **User Interface Improvements**
+- **Inline Editing**: Click-to-edit functionality for transaction fields
+- **Modern Popover Components**: Enhanced calendar and dropdown interfaces
+- **Responsive Design**: Improved mobile and desktop experience
+- **Visual Feedback**: Better loading states and user interactions
+
+#### 🔧 **Technical Improvements**
+- **Component Architecture**: Modular popover and calendar components
+- **TypeScript Integration**: Enhanced type safety across the application
+- **Error Handling**: Improved error states and recovery mechanisms
 
 ---
 

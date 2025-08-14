@@ -59,6 +59,7 @@ export function initializeDatabase() {
       category_id INTEGER,
       user_id INTEGER NOT NULL,
       date DATE NOT NULL,
+      source TEXT DEFAULT 'Manual Entry',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories (id),

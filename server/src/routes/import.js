@@ -278,9 +278,9 @@ router.post('/import', authenticateToken, [
 
         // Insert transaction
         const result = await runQuery(
-          `INSERT INTO transactions (description, amount, type, category_id, user_id, date) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [transaction.description, amount, type, categoryId, req.userId, transaction.date]
+          `INSERT INTO transactions (description, amount, type, category_id, user_id, date, source) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [transaction.description, amount, type, categoryId, req.userId, transaction.date, transaction.source]
         );
 
         importedTransactions.push({

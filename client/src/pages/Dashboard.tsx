@@ -1,15 +1,97 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
   PieChart,
-  Calendar
+  Calendar as CalendarIcon,
+  Tag,
+  Home,
+  Car,
+  ShoppingBag,
+  Film,
+  Heart,
+  Zap,
+  Book,
+  Briefcase,
+  TrendingUp as TrendingUpIcon,
+  Utensils,
+  Coffee,
+  ShoppingCart,
+  Wrench,
+  Fuel,
+  ParkingCircle,
+  Shirt,
+  Sofa,
+  BookOpen,
+  PenTool,
+  Gift,
+  Plane,
+  Stethoscope,
+  Pill,
+  Shield,
+  FileText,
+  Building,
+  Trees,
+  Package,
+  Repeat,
+  Mail,
+  Truck,
+  Tv,
+  Smartphone,
+  Sun,
+  GraduationCap,
+  Baby,
+  CircleDot,
+  HelpCircle,
+  CreditCard,
+  Camera,
+  Music,
+  Trophy,
+  Dumbbell,
+  Droplets,
+  Flame,
+  Thermometer,
+  Snowflake,
+  Wifi,
+  Phone,
+  Bitcoin,
+  Bed,
+  MapPin,
+  Monitor,
+  Footprints,
+  Gem,
+  Sparkles,
+  Fish,
+  Gamepad2,
+  Play,
+  Scissors,
+  Hand,
+  Palette,
+  Target,
+  Scale,
+  Megaphone,
+  Calculator,
+  Server,
+  Globe,
+  Key,
+  Cloud,
+  HardDrive,
+  Clock,
+  Star,
+  AlertTriangle,
+  Bus,
+  Train,
+  Settings,
+  RotateCcw,
+  Cpu,
+  MoreHorizontal
 } from "lucide-react";
 import {
   Table,
@@ -19,8 +101,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Calendar } from "@/components/ui/calendar";
 import { apiClient } from "@/integrations/api/client";
-import { format, subMonths, addMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, addMonths, startOfMonth, endOfMonth, subDays, addDays, isWithinInterval, parseISO, startOfYear, endOfYear } from "date-fns";
 
 interface Transaction {
   id: number;
@@ -30,6 +124,7 @@ interface Transaction {
   type: 'income' | 'expense';
   category_name: string;
   category_color: string;
+  category_icon?: string;
   source: string;
 }
 
@@ -42,7 +137,13 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [dateRange, setDateRange] = useState<{
+    from: Date;
+    to: Date;
+  }>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalIncome: 0,
     totalSpending: 0,
@@ -51,6 +152,12 @@ export default function Dashboard() {
     transactions: []
   });
   const [loading, setLoading] = useState(true);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
+  const [transactionPage, setTransactionPage] = useState(1);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -78,33 +185,142 @@ export default function Dashboard() {
   };
 
   const getCategoryIcon = (iconName?: string) => {
-    // For now, just return a simple div since we don't need complex icon handling in dashboard
-    return () => <div className="w-3 h-3 rounded-full bg-current" />;
+    const iconMap: Record<string, any> = {
+      // Basic icons
+      'tag': Tag,
+      'home': Home,
+      'car': Car,
+      'shopping-bag': ShoppingBag,
+      'film': Film,
+      'golf': Trophy, // Map 'golf' to 'Trophy' icon since no golf icon exists
+      'heart': Heart,
+      'zap': Zap,
+      'book': Book,
+      'dollar-sign': DollarSign,
+      'briefcase': Briefcase,
+      'trending-up': TrendingUpIcon,
+      'more-horizontal': MoreHorizontal,
+      
+      // Food & Dining
+      'utensils': Utensils,
+      'coffee': Coffee,
+      'shopping-cart': ShoppingCart,
+      
+      // Transportation
+      'wrench': Wrench,
+      'fuel': Fuel,
+      'parking-circle': ParkingCircle,
+      'plane': Plane,
+      
+      // Shopping & Retail
+      'shirt': Shirt,
+      'sofa': Sofa,
+      'book-open': BookOpen,
+      'pen-tool': PenTool,
+      'gift': Gift,
+      
+      // Health & Medical
+      'stethoscope': Stethoscope,
+      'pill': Pill,
+      
+      // Home & Utilities
+      'shield': Shield,
+      'file-text': FileText,
+      'building': Building,
+      'trees': Trees,
+      'tree': Trees, // Map 'tree' to 'Trees' icon
+      
+      // Business & Work
+      'package': Package,
+      'repeat': Repeat,
+      
+      // Services
+      'mail': Mail,
+      'truck': Truck,
+      'tv': Tv,
+      
+      // Technology & Communication
+      'smartphone': Smartphone,
+      
+      // Energy & Environment
+      'sun': Sun,
+      
+      // Education & Family
+      'graduation-cap': GraduationCap,
+      'baby': Baby,
+      
+      // Other
+      'circle-dot': CircleDot,
+      'help-circle': HelpCircle,
+      'credit-card': CreditCard,
+      
+      // Additional icons for variety
+      'camera': Camera,
+      'music': Music,
+      'trophy': Trophy,
+      'dumbbell': Dumbbell,
+      'droplets': Droplets,
+      'flame': Flame,
+      'thermometer': Thermometer,
+      'snowflake': Snowflake,
+      'wifi': Wifi,
+      'phone': Phone,
+      'bitcoin': Bitcoin,
+      'bed': Bed,
+      'map-pin': MapPin,
+      'monitor': Monitor,
+      'footprints': Footprints,
+      'gem': Gem,
+      'sparkles': Sparkles,
+      'fish': Fish,
+      'gamepad-2': Gamepad2,
+      'play': Play,
+      'scissors': Scissors,
+      'hand': Hand,
+      'palette': Palette,
+      'target': Target,
+      'scale': Scale,
+      'megaphone': Megaphone,
+      'calculator': Calculator,
+      'server': Server,
+      'globe': Globe,
+      'key': Key,
+      'cloud': Cloud,
+      'hard-drive': HardDrive,
+      'clock': Clock,
+      'star': Star,
+      'alert-triangle': AlertTriangle,
+      'bus': Bus,
+      'train': Train,
+      'settings': Settings,
+      'rotate-ccw': RotateCcw,
+      'cpu': Cpu
+    };
+    return iconMap[iconName || 'tag'] || Tag;
   };
 
-  const getMonthRange = (date: Date) => {
-    const start = startOfMonth(date);
-    const end = endOfMonth(date);
+  const getDateRange = (range: { from: Date; to: Date }) => {
     return {
-      start: format(start, 'yyyy-MM-dd'),
-      end: format(end, 'yyyy-MM-dd')
+      start: format(range.from, 'yyyy-MM-dd'),
+      end: format(range.to, 'yyyy-MM-dd')
     };
   };
 
-  const fetchDashboardData = async (date: Date) => {
+  const fetchSummaryData = async (range: { from: Date; to: Date }) => {
     try {
       setLoading(true);
-      const { start, end } = getMonthRange(date);
+      const { start, end } = getDateRange(range);
       
-      console.log('Fetching transactions for:', start, 'to', end);
+      console.log('Fetching summary data for:', start, 'to', end);
       
-      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&limit=1000`);
+      // Fetch all transactions for summary calculations (no pagination needed for summary)
+      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&limit=999999`);
       
-      console.log('API Response:', response);
+      console.log('Summary API Response:', response);
       
       if (response.transactions) {
         const transactions = response.transactions || [];
-        console.log('Transactions found:', transactions.length);
+        console.log('Transactions found for summary:', transactions.length);
         
         const totalIncome = transactions.reduce((sum: number, t: Transaction) => 
           sum + (t.type === 'income' ? t.amount : 0), 0);
@@ -120,13 +336,13 @@ export default function Dashboard() {
           totalSpending,
           netIncome,
           savingsRate,
-          transactions: transactions // Show all transactions for the month
+          transactions: [] // Don't store all transactions here, use lazy loading
         });
       } else {
         console.error('API returned error:', response.error);
       }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching summary data:', error);
       
       // Fallback to sample data for demonstration
       console.log('Using fallback sample data');
@@ -135,58 +351,146 @@ export default function Dashboard() {
         totalSpending: 3200,
         netIncome: 1800,
         savingsRate: 36,
-        transactions: [
-          {
-            id: 1,
-            date: '2025-08-15',
-            description: 'Salary Deposit',
-            amount: 5000,
-            type: 'income',
-            category_name: 'Income',
-            category_color: '#10B981',
-            source: 'Bank'
-          },
-          {
-            id: 2,
-            date: '2025-08-14',
-            description: 'Grocery Shopping',
-            amount: 150,
-            type: 'expense',
-            category_name: 'Food',
-            category_color: '#EF4444',
-            source: 'Bank'
-          },
-          {
-            id: 3,
-            date: '2025-08-13',
-            description: 'Gas Station',
-            amount: 45,
-            type: 'expense',
-            category_name: 'Transport',
-            category_color: '#3B82F6',
-            source: 'Bank'
-          }
-        ]
+        transactions: []
       });
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchTransactions = async (range: { from: Date; to: Date }, page: number = 1, reset: boolean = false) => {
+    try {
+      if (page === 1 || reset) {
+        setTransactionsLoading(true);
+      }
+      
+      const { start, end } = getDateRange(range);
+      const limit = 50; // Load 50 transactions at a time
+      
+      console.log('Fetching transactions page:', page, 'for:', start, 'to', end);
+      
+      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&limit=${limit}&page=${page}`);
+      
+      console.log('Transactions API Response:', response);
+      
+      if (response.transactions) {
+        const newTransactions = response.transactions || [];
+        console.log('New transactions loaded:', newTransactions.length);
+        
+        if (reset || page === 1) {
+          setAllTransactions(newTransactions);
+        } else {
+          setAllTransactions(prev => [...prev, ...newTransactions]);
+        }
+        
+        // Check if there are more transactions to load
+        const hasMore = response.pagination && response.pagination.page < response.pagination.pages;
+        setHasMoreTransactions(hasMore);
+        
+        console.log('Has more transactions:', hasMore);
+      } else {
+        console.error('Transactions API returned error:', response.error);
+        setHasMoreTransactions(false);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setHasMoreTransactions(false);
+    } finally {
+      setTransactionsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchDashboardData(selectedDate);
-  }, [selectedDate]);
+    // Reset pagination when date range changes
+    setTransactionPage(1);
+    setAllTransactions([]);
+    setHasMoreTransactions(true);
+    
+    // Fetch summary data and initial transactions
+    fetchSummaryData(dateRange);
+    fetchTransactions(dateRange, 1, true);
+  }, [dateRange]);
+
+  // Intersection Observer for lazy loading
+  const lastTransactionElementRef = useCallback((node: HTMLTableRowElement | null) => {
+    if (transactionsLoading) return;
+    if (observerRef.current) observerRef.current.disconnect();
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMoreTransactions) {
+        console.log('Loading more transactions...');
+        setTransactionPage(prevPage => {
+          const nextPage = prevPage + 1;
+          fetchTransactions(dateRange, nextPage, false);
+          return nextPage;
+        });
+      }
+    });
+    
+    if (node) observerRef.current.observe(node);
+  }, [transactionsLoading, hasMoreTransactions, dateRange]);
 
   const handlePreviousMonth = () => {
-    setSelectedDate(prev => subMonths(prev, 1));
+    setDateRange(prev => ({
+      from: subMonths(prev.from, 1),
+      to: subMonths(prev.to, 1)
+    }));
   };
 
   const handleNextMonth = () => {
-    setSelectedDate(prev => addMonths(prev, 1));
+    setDateRange(prev => ({
+      from: addMonths(prev.from, 1),
+      to: addMonths(prev.to, 1)
+    }));
   };
 
   const handleCurrentMonth = () => {
-    setSelectedDate(new Date());
+    setDateRange({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date())
+    });
+  };
+
+  const handleLastMonth = () => {
+    const lastMonth = subMonths(new Date(), 1);
+    setDateRange({
+      from: startOfMonth(lastMonth),
+      to: endOfMonth(lastMonth)
+    });
+  };
+
+  const handleLast3Months = () => {
+    const lastMonth = subMonths(new Date(), 1);
+    const threeMonthsAgo = subMonths(lastMonth, 2);
+    setDateRange({
+      from: startOfMonth(threeMonthsAgo),
+      to: endOfMonth(lastMonth)
+    });
+  };
+
+  const handleLast6Months = () => {
+    const lastMonth = subMonths(new Date(), 1);
+    const sixMonthsAgo = subMonths(lastMonth, 5);
+    setDateRange({
+      from: startOfMonth(sixMonthsAgo),
+      to: endOfMonth(lastMonth)
+    });
+  };
+
+  const handleLast12Months = () => {
+    const lastMonth = subMonths(new Date(), 1);
+    const twelveMonthsAgo = subMonths(lastMonth, 11);
+    setDateRange({
+      from: startOfMonth(twelveMonthsAgo),
+      to: endOfMonth(lastMonth)
+    });
+  };
+
+  const handleThisYear = () => {
+    setDateRange({
+      from: startOfYear(new Date()),
+      to: endOfYear(new Date())
+    });
   };
 
   const summaryCards = [
@@ -241,16 +545,49 @@ export default function Dashboard() {
             <ChevronLeft className="w-4 h-4" />
           </Button>
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleCurrentMonth}
-            disabled={loading}
-            className="min-w-[140px]"
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            {format(selectedDate, 'MMMM yyyy')}
-          </Button>
+          <div className="relative">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  disabled={loading}
+                  className="min-w-[200px] justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd, yyyy")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "MMM dd, yyyy")
+                    )
+                  ) : (
+                    <span>Pick a date range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent 
+                className="w-auto p-3 bg-white border shadow-xl" 
+                align="end" 
+                sideOffset={8}
+                side="bottom"
+              >
+                <Calendar
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={(range: any) => {
+                    if (range?.from && range?.to) {
+                      setDateRange(range);
+                    }
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
           
           <Button 
             variant="outline" 
@@ -260,6 +597,40 @@ export default function Dashboard() {
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={loading}
+                className="ml-2"
+              >
+                Quick Select
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleCurrentMonth}>
+                This Month
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLastMonth}>
+                Last Month
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLast3Months}>
+                Last 3 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLast6Months}>
+                Last 6 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLast12Months}>
+                Last 12 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleThisYear}>
+                This Year
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -278,7 +649,11 @@ export default function Dashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{item.amount}</div>
               <p className="text-xs text-muted-foreground">
-                {format(selectedDate, 'MMMM yyyy')}
+                {dateRange.from && dateRange.to ? (
+                  `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
+                ) : (
+                  'Select date range'
+                )}
               </p>
             </CardContent>
           </Card>
@@ -288,68 +663,110 @@ export default function Dashboard() {
       {/* Transactions for Selected Month */}
       <Card>
         <CardHeader>
-          <CardTitle>Transactions - {format(selectedDate, 'MMMM yyyy')} ({dashboardData.transactions.length} transactions)</CardTitle>
+          <CardTitle>
+          Transactions - {dateRange.from && dateRange.to ? (
+            `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
+          ) : (
+            'Select date range'
+          )} ({allTransactions.length} transactions{hasMoreTransactions ? '+' : ''})
+        </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Loading transactions...</div>
+              <div className="text-muted-foreground">Loading summary...</div>
             </div>
-          ) : dashboardData.transactions.length === 0 ? (
+          ) : allTransactions.length === 0 && !transactionsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">No transactions found for this month</div>
+              <div className="text-muted-foreground">No transactions found for this period</div>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="h-10">
-                  <TableHead className="w-20">Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="w-32">Category</TableHead>
-                  <TableHead className="w-20">Type</TableHead>
-                  <TableHead className="w-24 text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dashboardData.transactions.map((transaction) => (
-                  <TableRow key={transaction.id} className="min-h-12">
-                    <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
-                      {transaction.date}
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <div className="flex items-start gap-2">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" 
-                          style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
-                        />
-                        <div className="font-medium text-sm break-words leading-relaxed flex-1">
-                          {transaction.description}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
-                        />
-                        <span className="text-xs">
-                          {transaction.category_name || 'Uncategorized'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-2 py-0.5">
-                        {transaction.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={`text-right font-medium text-sm py-2 ${getAmountColor(transaction.type)}`}>
-                      {formatAmount(transaction.amount, transaction.type)}
-                    </TableCell>
+            <div className="max-h-[600px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="h-10">
+                    <TableHead className="w-20">Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-32">Category</TableHead>
+                    <TableHead className="w-24">Source</TableHead>
+                    <TableHead className="w-20">Type</TableHead>
+                    <TableHead className="w-24 text-right">Amount</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {allTransactions.map((transaction, index) => {
+                    const isLast = index === allTransactions.length - 1;
+                    return (
+                      <TableRow 
+                        key={transaction.id} 
+                        className="min-h-12"
+                        ref={isLast ? lastTransactionElementRef : null}
+                      >
+                        <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
+                          {transaction.date}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-start gap-2">
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" 
+                              style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
+                            />
+                            <div className="font-medium text-sm break-words leading-relaxed flex-1">
+                              {transaction.description}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {transaction.category_icon ? (
+                              <div className="flex items-center gap-1.5">
+                                {(() => {
+                                  const IconComponent = getCategoryIcon(transaction.category_icon);
+                                  return <IconComponent className="w-3 h-3" style={{ color: getCategoryColor(transaction.category_color) }} />;
+                                })()}
+                                <span className="text-xs">
+                                  {transaction.category_name || 'Uncategorized'}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <div 
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                                  style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
+                                />
+                                <span className="text-xs">
+                                  {transaction.category_name || 'Uncategorized'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="text-sm text-muted-foreground">
+                            {transaction.source || 'Manual Entry'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-2 py-0.5">
+                            {transaction.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-right font-medium text-sm py-2 ${getAmountColor(transaction.type)}`}>
+                          {formatAmount(transaction.amount, transaction.type)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {transactionsLoading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
+                        <div className="text-muted-foreground">Loading more transactions...</div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

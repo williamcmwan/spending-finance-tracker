@@ -144,6 +144,7 @@ interface Transaction {
   category_color?: string;
   category_icon?: string;
   date: string;
+  source?: string;
   created_at: string;
   updated_at: string;
 }
@@ -168,11 +169,13 @@ interface TransactionFormData {
   type: 'income' | 'expense';
   category_id?: number;
   date: string;
+  source: string;
 }
 
 interface FilterData {
   type?: 'income' | 'expense';
   category_id?: number;
+  source?: string;
   start_date?: string;
   end_date?: string;
   min_amount?: string;
@@ -200,13 +203,15 @@ export default function Transactions() {
   const [inlineEditingCategory, setInlineEditingCategory] = useState<number | null>(null);
   const [inlineEditingDate, setInlineEditingDate] = useState<number | null>(null);
   const [inlineEditingDescription, setInlineEditingDescription] = useState<number | null>(null);
-  const [inlineEditValues, setInlineEditValues] = useState<{ date?: string; description?: string }>({});
+  const [inlineEditingSource, setInlineEditingSource] = useState<number | null>(null);
+  const [inlineEditValues, setInlineEditValues] = useState<{ date?: string; description?: string; source?: string }>({});
   const [formData, setFormData] = useState<TransactionFormData>({
     description: '',
     amount: '',
     type: 'expense',
     category_id: undefined,
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    source: 'Manual Entry'
   });
   const [filterData, setFilterData] = useState<FilterData>({});
   const [activeFilters, setActiveFilters] = useState<FilterData>({});
@@ -273,7 +278,7 @@ export default function Transactions() {
           const cleanAmount = search.replace(/[$,\s]/g, '');
           params.amount = cleanAmount;
         } else {
-          // Otherwise search in description and category
+          // Otherwise search in description, category, and source
           params.description = search;
         }
       }
@@ -285,6 +290,9 @@ export default function Transactions() {
       }
       if (currentFilters.category_id) {
         params.category_id = currentFilters.category_id;
+      }
+      if (currentFilters.source) {
+        params.source = currentFilters.source;
       }
       if (currentFilters.start_date) {
         params.start_date = currentFilters.start_date;
@@ -386,7 +394,8 @@ export default function Transactions() {
       amount: '',
       type: 'expense',
       category_id: undefined,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      source: 'Manual Entry'
     });
     setIsAddDialogOpen(true);
   };
@@ -398,7 +407,8 @@ export default function Transactions() {
       amount: Math.abs(transaction.amount).toString(),
       type: transaction.type,
       category_id: transaction.category_id,
-      date: transaction.date
+      date: transaction.date,
+      source: transaction.source || 'Manual Entry'
     });
     setIsEditDialogOpen(true);
   };
@@ -494,6 +504,30 @@ export default function Transactions() {
       toast({
         title: "Error",
         description: "Failed to update description",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleInlineSourceChange = async (transactionId: number, newSource: string) => {
+    try {
+      await apiClient.updateTransaction(transactionId, {
+        source: newSource
+      });
+      
+      toast({
+        title: "Success",
+        description: "Source updated successfully",
+      });
+      
+      fetchTransactions(searchQuery, pagination.page, pagination.limit, activeFilters);
+      setInlineEditingSource(null);
+      setInlineEditValues({});
+    } catch (error: any) {
+      console.error('Error updating source:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update source",
         variant: "destructive",
       });
     }
@@ -755,7 +789,8 @@ export default function Transactions() {
         amount: amount,
         type: formData.type,
         category_id: formData.category_id,
-        date: formData.date
+        date: formData.date,
+        source: formData.source
       });
       
       toast({
@@ -805,7 +840,8 @@ export default function Transactions() {
         amount: amount,
         type: formData.type,
         category_id: formData.category_id,
-        date: formData.date
+        date: formData.date,
+        source: formData.source
       });
       
       toast({
@@ -833,7 +869,8 @@ export default function Transactions() {
       amount: '',
       type: 'expense',
       category_id: undefined,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      source: 'Manual Entry'
     });
     setEditingTransaction(null);
   };
@@ -1191,6 +1228,14 @@ export default function Transactions() {
                       </div>
                     </TableHead>
                     <TableHead 
+                      className="w-24 cursor-pointer hover:bg-muted/50" 
+                      onClick={() => handleSort('source')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Source {getSortIcon('source')}
+                      </div>
+                    </TableHead>
+                    <TableHead 
                       className="w-20 cursor-pointer hover:bg-muted/50" 
                       onClick={() => handleSort('type')}
                     >
@@ -1338,6 +1383,35 @@ export default function Transactions() {
                         )}
                       </TableCell>
                       <TableCell className="py-2">
+                        {inlineEditingSource === transaction.id ? (
+                          <Input
+                            value={inlineEditValues.source || transaction.source || 'Manual Entry'}
+                            onChange={(e) => setInlineEditValues(prev => ({ ...prev, source: e.target.value }))}
+                            onBlur={() => handleInlineSourceChange(transaction.id, inlineEditValues.source || transaction.source || 'Manual Entry')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleInlineSourceChange(transaction.id, inlineEditValues.source || transaction.source || 'Manual Entry');
+                              } else if (e.key === 'Escape') {
+                                setInlineEditingSource(null);
+                                setInlineEditValues({});
+                              }
+                            }}
+                            className="h-8 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <div 
+                            className="text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 px-1 py-1 rounded"
+                            onClick={() => {
+                              setInlineEditingSource(transaction.id);
+                              setInlineEditValues({ source: transaction.source || 'Manual Entry' });
+                            }}
+                          >
+                            {transaction.source || 'Manual Entry'}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2">
                         <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-2 py-0.5">
                           {transaction.type}
                         </Badge>
@@ -1471,6 +1545,18 @@ export default function Transactions() {
                 className="col-span-3"
               />
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="source" className="text-right">
+                Source
+              </Label>
+              <Input
+                id="source"
+                value={formData.source}
+                onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value }))}
+                className="col-span-3"
+                placeholder="e.g., Chase Bank, Cash, etc."
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button 
@@ -1568,6 +1654,18 @@ export default function Transactions() {
                 className="col-span-3"
               />
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-source" className="text-right">
+                Source
+              </Label>
+              <Input
+                id="edit-source"
+                value={formData.source}
+                onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value }))}
+                className="col-span-3"
+                placeholder="e.g., Chase Bank, Cash, etc."
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button 
@@ -1636,6 +1734,18 @@ export default function Transactions() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="filter-source" className="text-right">
+                Source
+              </Label>
+              <Input
+                id="filter-source"
+                value={filterData.source || ''}
+                onChange={(e) => setFilterData(prev => ({ ...prev, source: e.target.value || undefined }))}
+                className="col-span-3"
+                placeholder="Filter by source (e.g., Chase Bank)"
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="filter-start-date" className="text-right">
