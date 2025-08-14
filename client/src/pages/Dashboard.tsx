@@ -11,6 +11,14 @@ import {
   PieChart,
   Calendar
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { apiClient } from "@/integrations/api/client";
 import { format, subMonths, addMonths, startOfMonth, endOfMonth } from "date-fns";
 
@@ -55,6 +63,25 @@ export default function Dashboard() {
     return `${value.toFixed(1)}%`;
   };
 
+  const formatAmount = (amount: number, type: 'income' | 'expense') => {
+    const isPositive = type === 'income';
+    const formatted = Math.abs(amount).toFixed(2);
+    return isPositive ? `+$${formatted}` : `-$${formatted}`;
+  };
+
+  const getAmountColor = (type: 'income' | 'expense') => {
+    return type === 'income' ? "text-green-600" : "text-red-600";
+  };
+
+  const getCategoryColor = (color: string) => {
+    return color || '#6B7280';
+  };
+
+  const getCategoryIcon = (iconName?: string) => {
+    // For now, just return a simple div since we don't need complex icon handling in dashboard
+    return () => <div className="w-3 h-3 rounded-full bg-current" />;
+  };
+
   const getMonthRange = (date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
@@ -93,7 +120,7 @@ export default function Dashboard() {
           totalSpending,
           netIncome,
           savingsRate,
-          transactions: transactions.slice(0, 10) // Show only first 10 transactions
+          transactions: transactions // Show all transactions for the month
         });
       } else {
         console.error('API returned error:', response.error);
@@ -261,7 +288,7 @@ export default function Dashboard() {
       {/* Transactions for Selected Month */}
       <Card>
         <CardHeader>
-          <CardTitle>Transactions - {format(selectedDate, 'MMMM yyyy')}</CardTitle>
+          <CardTitle>Transactions - {format(selectedDate, 'MMMM yyyy')} ({dashboardData.transactions.length} transactions)</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -273,35 +300,56 @@ export default function Dashboard() {
               <div className="text-muted-foreground">No transactions found for this month</div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {dashboardData.transactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between p-4 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium">{transaction.description}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {format(new Date(transaction.date), 'MMM dd, yyyy')}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <Badge variant="outline">{transaction.category_name}</Badge>
-                    <span className={`font-medium ${
-                      transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {transaction.type === 'income' 
-                        ? `+${formatCurrency(transaction.amount)}`
-                        : `-${formatCurrency(transaction.amount)}`
-                      }
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="h-10">
+                  <TableHead className="w-20">Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-32">Category</TableHead>
+                  <TableHead className="w-20">Type</TableHead>
+                  <TableHead className="w-24 text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dashboardData.transactions.map((transaction) => (
+                  <TableRow key={transaction.id} className="min-h-12">
+                    <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
+                      {transaction.date}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <div className="flex items-start gap-2">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" 
+                          style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
+                        />
+                        <div className="font-medium text-sm break-words leading-relaxed flex-1">
+                          {transaction.description}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
+                        />
+                        <span className="text-xs">
+                          {transaction.category_name || 'Uncategorized'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-2 py-0.5">
+                        {transaction.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={`text-right font-medium text-sm py-2 ${getAmountColor(transaction.type)}`}>
+                      {formatAmount(transaction.amount, transaction.type)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
