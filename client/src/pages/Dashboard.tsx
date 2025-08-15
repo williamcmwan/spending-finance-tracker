@@ -156,6 +156,7 @@ export default function Dashboard() {
   const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
   const [transactionPage, setTransactionPage] = useState(1);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [totalTransactionCount, setTotalTransactionCount] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -383,11 +384,17 @@ export default function Dashboard() {
           setAllTransactions(prev => [...prev, ...newTransactions]);
         }
         
-        // Check if there are more transactions to load
+        // Check if there are more transactions to load and set total count
         const hasMore = response.pagination && response.pagination.page < response.pagination.pages;
         setHasMoreTransactions(hasMore);
         
+        // Set total transaction count from pagination info
+        if (response.pagination && response.pagination.total !== undefined) {
+          setTotalTransactionCount(response.pagination.total);
+        }
+        
         console.log('Has more transactions:', hasMore);
+        console.log('Total transactions:', response.pagination?.total);
       } else {
         console.error('Transactions API returned error:', response.error);
         setHasMoreTransactions(false);
@@ -405,6 +412,7 @@ export default function Dashboard() {
     setTransactionPage(1);
     setAllTransactions([]);
     setHasMoreTransactions(true);
+    setTotalTransactionCount(0);
     
     // Fetch summary data and initial transactions
     fetchSummaryData(dateRange);
@@ -668,7 +676,7 @@ export default function Dashboard() {
             `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
           ) : (
             'Select date range'
-          )} ({allTransactions.length} transactions{hasMoreTransactions ? '+' : ''})
+          )} ({totalTransactionCount} transactions)
         </CardTitle>
         </CardHeader>
         <CardContent>
