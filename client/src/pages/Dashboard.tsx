@@ -115,6 +115,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { apiClient } from "@/integrations/api/client";
 import { format, subMonths, addMonths, startOfMonth, endOfMonth, subDays, addDays, isWithinInterval, parseISO, startOfYear, endOfYear } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Transaction {
   id: number;
@@ -135,6 +136,17 @@ interface CategorySpending {
   total_amount: number;
   percentage: number;
   transaction_count: number;
+}
+
+interface MonthlySpendingData {
+  month: string;
+  [categoryName: string]: number | string;
+}
+
+interface ChartCategoryData {
+  name: string;
+  color: string;
+  total: number;
 }
 
 interface DashboardData {
@@ -167,6 +179,8 @@ export default function Dashboard() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [totalTransactionCount, setTotalTransactionCount] = useState(0);
   const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
+  const [monthlyChartData, setMonthlyChartData] = useState<MonthlySpendingData[]>([]);
+  const [chartCategories, setChartCategories] = useState<ChartCategoryData[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -483,6 +497,92 @@ export default function Dashboard() {
     }
   };
 
+  const fetchMonthlyChartData = async (range: { from: Date; to: Date }) => {
+    try {
+      const { start, end } = getDateRange(range);
+      
+      console.log('Fetching monthly chart data for:', start, 'to', end);
+      
+      // Fetch all expense transactions for chart analysis
+      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      
+      if (response.transactions) {
+        const transactions = response.transactions || [];
+        
+        // Group transactions by month and category
+        const monthlyData = new Map<string, Map<string, { amount: number; color: string }>>();
+        const categoryTotals = new Map<string, { total: number; color: string }>();
+        
+        transactions.forEach((transaction: Transaction) => {
+          const monthKey = format(new Date(transaction.date), 'MMM yyyy');
+          const categoryName = transaction.category_name || 'Uncategorized';
+          const amount = transaction.amount;
+          const color = getCategoryColor(transaction.category_color);
+          
+          // Track monthly data
+          if (!monthlyData.has(monthKey)) {
+            monthlyData.set(monthKey, new Map());
+          }
+          const monthMap = monthlyData.get(monthKey)!;
+          
+          if (monthMap.has(categoryName)) {
+            monthMap.get(categoryName)!.amount += amount;
+          } else {
+            monthMap.set(categoryName, { amount, color });
+          }
+          
+          // Track category totals for top 10 selection
+          if (categoryTotals.has(categoryName)) {
+            categoryTotals.get(categoryName)!.total += amount;
+          } else {
+            categoryTotals.set(categoryName, { total: amount, color });
+          }
+        });
+        
+        // Get top 10 categories by total spending
+        const sortedCategories = Array.from(categoryTotals.entries())
+          .sort(([,a], [,b]) => b.total - a.total)
+          .slice(0, 10);
+        
+        const top10Categories: ChartCategoryData[] = sortedCategories.map(([name, data]) => ({
+          name,
+          color: data.color,
+          total: data.total
+        }));
+        
+        // Create chart data structure
+        const chartData: MonthlySpendingData[] = Array.from(monthlyData.entries()).map(([month, categoryMap]) => {
+          const monthData: MonthlySpendingData = { month };
+          
+          // Add data for each of the top 10 categories
+          top10Categories.forEach(category => {
+            const categoryData = categoryMap.get(category.name);
+            monthData[category.name] = categoryData ? categoryData.amount : 0;
+          });
+          
+          return monthData;
+        });
+        
+        // Sort chart data by month chronologically
+        chartData.sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+        
+        setMonthlyChartData(chartData);
+        setChartCategories(top10Categories);
+        
+        console.log('Monthly chart data:', chartData);
+        console.log('Chart categories:', top10Categories);
+      } else {
+        console.error('Monthly chart API returned error:', response.error);
+        setMonthlyChartData([]);
+        setChartCategories([]);
+      }
+    } catch (error) {
+      console.error('Error fetching monthly chart data:', error);
+      setMonthlyChartData([]);
+      setChartCategories([]);
+    }
+  };
+
   useEffect(() => {
     // Reset pagination when date range changes
     setTransactionPage(1);
@@ -490,10 +590,13 @@ export default function Dashboard() {
     setHasMoreTransactions(true);
     setTotalTransactionCount(0);
     setCategorySpending([]);
+    setMonthlyChartData([]);
+    setChartCategories([]);
     
-    // Fetch summary data, category spending, and initial transactions
+    // Fetch summary data, category spending, chart data, and initial transactions
     fetchSummaryData(dateRange);
     fetchCategorySpending(dateRange);
+    fetchMonthlyChartData(dateRange);
     fetchTransactions(dateRange, 1, true);
   }, [dateRange]);
 
@@ -745,6 +848,67 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Monthly Spending Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Monthly Spending Trends - Top 10 Categories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Loading chart data...</div>
+            </div>
+          ) : monthlyChartData.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">No data available for chart</div>
+            </div>
+          ) : (
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={monthlyChartData}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fontSize: 12 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `$${value.toLocaleString()}`}
+                  />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => [`$${value.toFixed(2)}`, name]}
+                    labelFormatter={(label) => `Month: ${label}`}
+                  />
+                  <Legend />
+                  {chartCategories.map((category, index) => (
+                    <Bar
+                      key={category.name}
+                      dataKey={category.name}
+                      stackId="spending"
+                      fill={category.color}
+                      name={category.name}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Category Spending Analysis */}
       <Card>
