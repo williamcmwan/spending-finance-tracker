@@ -705,8 +705,8 @@ export default function Transactions() {
       // Convert transactions to CSV format
       const headers = [
         'Date', 'Year', 'Month', 'Details / Description', 
-        'Income Amount', 'Spending Amount', 'Category', 
-        'Source / Bank', 'Currency', 'Spending for non-EUR currency'
+        'Income Amount', 'Spending Amount', 'Capex Amount', 'Category', 
+        'Source / Bank', 'Transaction Type', 'Currency', 'Spending for non-EUR currency'
       ];
       
       const csvRows = [headers.join(',')];
@@ -718,6 +718,7 @@ export default function Transactions() {
         
         const incomeAmount = transaction.type === 'income' ? Math.abs(transaction.amount).toFixed(2) : '0.00';
         const spendingAmount = transaction.type === 'expense' ? Math.abs(transaction.amount).toFixed(2) : '0.00';
+        const capexAmount = transaction.type === 'capex' ? Math.abs(transaction.amount).toFixed(2) : '0.00';
         
         const row = [
           transaction.date,
@@ -726,8 +727,10 @@ export default function Transactions() {
           `"${transaction.description}"`,
           incomeAmount,
           spendingAmount,
+          capexAmount,
           `"${transaction.category_name || ''}"`,
-          '"Manual Entry"',
+          `"${transaction.source || 'Manual Entry'}"`,
+          `"${transaction.type}"`,
           '"EUR"',
           '""'
         ];
