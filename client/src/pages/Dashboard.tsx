@@ -128,6 +128,15 @@ interface Transaction {
   source: string;
 }
 
+interface CategorySpending {
+  category_name: string;
+  category_color: string;
+  category_icon?: string;
+  total_amount: number;
+  percentage: number;
+  transaction_count: number;
+}
+
 interface DashboardData {
   totalIncome: number;
   totalSpending: number;
@@ -157,6 +166,7 @@ export default function Dashboard() {
   const [transactionPage, setTransactionPage] = useState(1);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [totalTransactionCount, setTotalTransactionCount] = useState(0);
+  const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -407,15 +417,83 @@ export default function Dashboard() {
     }
   };
 
+  const fetchCategorySpending = async (range: { from: Date; to: Date }) => {
+    try {
+      const { start, end } = getDateRange(range);
+      
+      console.log('Fetching category spending for:', start, 'to', end);
+      
+      // Fetch all expense transactions for category analysis
+      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      
+      console.log('Category spending API Response:', response);
+      
+      if (response.transactions) {
+        const transactions = response.transactions || [];
+        
+        // Group transactions by category and calculate totals
+        const categoryMap = new Map<string, {
+          category_name: string;
+          category_color: string;
+          category_icon?: string;
+          total_amount: number;
+          transaction_count: number;
+        }>();
+        
+        let totalExpenses = 0;
+        
+        transactions.forEach((transaction: Transaction) => {
+          const categoryName = transaction.category_name || 'Uncategorized';
+          const amount = transaction.amount;
+          totalExpenses += amount;
+          
+          if (categoryMap.has(categoryName)) {
+            const existing = categoryMap.get(categoryName)!;
+            existing.total_amount += amount;
+            existing.transaction_count += 1;
+          } else {
+            categoryMap.set(categoryName, {
+              category_name: categoryName,
+              category_color: transaction.category_color,
+              category_icon: transaction.category_icon,
+              total_amount: amount,
+              transaction_count: 1
+            });
+          }
+        });
+        
+        // Convert to array and calculate percentages
+        const categorySpendingData: CategorySpending[] = Array.from(categoryMap.values()).map(category => ({
+          ...category,
+          percentage: totalExpenses > 0 ? (category.total_amount / totalExpenses) * 100 : 0
+        }));
+        
+        // Sort by highest spending first
+        categorySpendingData.sort((a, b) => b.total_amount - a.total_amount);
+        
+        setCategorySpending(categorySpendingData);
+        console.log('Category spending data:', categorySpendingData);
+      } else {
+        console.error('Category spending API returned error:', response.error);
+        setCategorySpending([]);
+      }
+    } catch (error) {
+      console.error('Error fetching category spending:', error);
+      setCategorySpending([]);
+    }
+  };
+
   useEffect(() => {
     // Reset pagination when date range changes
     setTransactionPage(1);
     setAllTransactions([]);
     setHasMoreTransactions(true);
     setTotalTransactionCount(0);
+    setCategorySpending([]);
     
-    // Fetch summary data and initial transactions
+    // Fetch summary data, category spending, and initial transactions
     fetchSummaryData(dateRange);
+    fetchCategorySpending(dateRange);
     fetchTransactions(dateRange, 1, true);
   }, [dateRange]);
 
@@ -667,6 +745,95 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Category Spending Analysis */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Spending by Category - {dateRange.from && dateRange.to ? (
+              `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
+            ) : (
+              'Select date range'
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Loading category data...</div>
+            </div>
+          ) : categorySpending.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">No expense data found for this period</div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8"></TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="w-24 text-center">Transactions</TableHead>
+                  <TableHead className="w-32 text-right">Amount</TableHead>
+                  <TableHead className="w-20 text-right">Percentage</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categorySpending.map((category, index) => {
+                  const IconComponent = getCategoryIcon(category.category_icon);
+                  return (
+                    <TableRow key={category.category_name}>
+                      <TableCell className="py-3">
+                        <div className="flex items-center justify-center">
+                          {category.category_icon ? (
+                            <IconComponent 
+                              className="w-4 h-4" 
+                              style={{ color: getCategoryColor(category.category_color) }} 
+                            />
+                          ) : (
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: getCategoryColor(category.category_color) }}
+                            />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="font-medium">{category.category_name}</div>
+                      </TableCell>
+                      <TableCell className="py-3 text-center">
+                        <div className="text-sm text-muted-foreground">
+                          {category.transaction_count}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-right">
+                        <div className="font-medium text-red-600">
+                          ${category.total_amount.toFixed(2)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="text-sm font-medium">
+                            {category.percentage.toFixed(1)}%
+                          </div>
+                          <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full"
+                              style={{ 
+                                width: `${Math.min(category.percentage, 100)}%`,
+                                backgroundColor: getCategoryColor(category.category_color)
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Transactions for Selected Month */}
       <Card>
