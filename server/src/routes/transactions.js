@@ -25,7 +25,7 @@ const authenticateToken = (req, res, next) => {
 // Get all transactions for user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 20, type, category_id, start_date, end_date, description, amount, source, sort_field = 'date', sort_direction = 'desc' } = req.query;
+    const { page = 1, limit = 20, type, category_id, start_date, end_date, description, amount, source, min_amount, max_amount, sort_field = 'date', sort_direction = 'desc' } = req.query;
     const offset = (page - 1) * limit;
     
     let whereClause = 'WHERE t.user_id = ?';
@@ -54,6 +54,16 @@ router.get('/', authenticateToken, async (req, res) => {
     if (end_date) {
       whereClause += ' AND t.date <= ?';
       params.push(end_date);
+    }
+
+    if (min_amount) {
+      whereClause += ' AND t.amount >= ?';
+      params.push(parseFloat(min_amount));
+    }
+
+    if (max_amount) {
+      whereClause += ' AND t.amount <= ?';
+      params.push(parseFloat(max_amount));
     }
 
     // Add date search functionality
