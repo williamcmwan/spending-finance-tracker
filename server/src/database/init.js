@@ -55,7 +55,7 @@ export function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       description TEXT NOT NULL,
       amount DECIMAL(10,2) NOT NULL,
-      type TEXT CHECK(type IN ('income', 'expense')) NOT NULL,
+      type TEXT CHECK(type IN ('income', 'expense', 'capex')) NOT NULL,
       category_id INTEGER,
       user_id INTEGER NOT NULL,
       date DATE NOT NULL,

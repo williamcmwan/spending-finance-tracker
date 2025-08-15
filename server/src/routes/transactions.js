@@ -257,7 +257,7 @@ router.post('/', [
   authenticateToken,
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be a positive number'),
-  body('type').isIn(['income', 'expense']).withMessage('Type must be income or expense'),
+  body('type').isIn(['income', 'expense', 'capex']).withMessage('Type must be income, expense, or capex'),
   body('date').isISO8601().withMessage('Date must be a valid date'),
   body('category_id').optional().isInt().withMessage('Category ID must be a number'),
   body('source').optional().isString().withMessage('Source must be a string')
@@ -309,7 +309,7 @@ router.put('/:id', [
   authenticateToken,
   body('description').optional().trim().notEmpty().withMessage('Description cannot be empty'),
   body('amount').optional().isFloat({ min: 0.01 }).withMessage('Amount must be a positive number'),
-  body('type').optional().isIn(['income', 'expense']).withMessage('Type must be income or expense'),
+  body('type').optional().isIn(['income', 'expense', 'capex']).withMessage('Type must be income, expense, or capex'),
   body('date').optional().isISO8601().withMessage('Date must be a valid date'),
   body('category_id').optional().isInt().withMessage('Category ID must be a number'),
   body('source').optional().isString().withMessage('Source must be a string')

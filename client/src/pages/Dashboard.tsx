@@ -8,7 +8,8 @@ import {
   ChevronDown,
   TrendingUp, 
   TrendingDown, 
-  DollarSign, 
+  DollarSign,
+  Building, 
   PieChart,
   Calendar as CalendarIcon,
   Tag,
@@ -129,7 +130,7 @@ interface Transaction {
   date: string;
   description: string;
   amount: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'capex';
   category_name: string;
   category_color: string;
   category_icon?: string;
@@ -159,6 +160,7 @@ interface ChartCategoryData {
 interface DashboardData {
   totalIncome: number;
   totalSpending: number;
+  totalCapex: number;
   netIncome: number;
   savingsRate: number;
   transactions: Transaction[];
@@ -175,6 +177,7 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalIncome: 0,
     totalSpending: 0,
+    totalCapex: 0,
     netIncome: 0,
     savingsRate: 0,
     transactions: []
@@ -203,14 +206,16 @@ export default function Dashboard() {
     return `${value.toFixed(1)}%`;
   };
 
-  const formatAmount = (amount: number, type: 'income' | 'expense') => {
+  const formatAmount = (amount: number, type: 'income' | 'expense' | 'capex') => {
     const isPositive = type === 'income';
     const formatted = Math.abs(amount).toFixed(2);
     return isPositive ? `+$${formatted}` : `-$${formatted}`;
   };
 
-  const getAmountColor = (type: 'income' | 'expense') => {
-    return type === 'income' ? "text-green-600" : "text-red-600";
+  const getAmountColor = (type: 'income' | 'expense' | 'capex') => {
+    if (type === 'income') return "text-green-600";
+    if (type === 'capex') return "text-blue-600";
+    return "text-red-600";
   };
 
   const getCategoryColor = (color: string) => {
@@ -368,7 +373,9 @@ export default function Dashboard() {
           sum + (t.type === 'income' ? t.amount : 0), 0);
         const totalSpending = transactions.reduce((sum: number, t: Transaction) => 
           sum + (t.type === 'expense' ? t.amount : 0), 0);
-        const netIncome = totalIncome - totalSpending;
+        const totalCapex = transactions.reduce((sum: number, t: Transaction) => 
+          sum + (t.type === 'capex' ? t.amount : 0), 0);
+        const netIncome = totalIncome - totalSpending - totalCapex;
         const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
 
         console.log('Calculated totals:', { totalIncome, totalSpending, netIncome, savingsRate });
@@ -376,6 +383,7 @@ export default function Dashboard() {
         setDashboardData({
           totalIncome,
           totalSpending,
+          totalCapex,
           netIncome,
           savingsRate,
           transactions: [] // Don't store all transactions here, use lazy loading
@@ -391,8 +399,9 @@ export default function Dashboard() {
       setDashboardData({
         totalIncome: 5000,
         totalSpending: 3200,
-        netIncome: 1800,
-        savingsRate: 36,
+        totalCapex: 800,
+        netIncome: 1000,
+        savingsRate: 20,
         transactions: []
       });
     } finally {
@@ -454,13 +463,16 @@ export default function Dashboard() {
       
       console.log('Fetching category spending for:', start, 'to', end);
       
-      // Fetch all expense transactions for category analysis
-      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      // Fetch all expense and capex transactions for category analysis
+      const expenseResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      const capexResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=capex&limit=999999`);
       
-      console.log('Category spending API Response:', response);
+      console.log('Category spending API Response:', expenseResponse, capexResponse);
       
-      if (response.transactions) {
-        const transactions = response.transactions || [];
+      if (expenseResponse.transactions || capexResponse.transactions) {
+        const expenseTransactions = expenseResponse.transactions || [];
+        const capexTransactions = capexResponse.transactions || [];
+        const transactions = [...expenseTransactions, ...capexTransactions];
         
         // Group transactions by category and calculate totals
         const categoryMap = new Map<string, {
@@ -505,7 +517,7 @@ export default function Dashboard() {
         setCategorySpending(categorySpendingData);
         console.log('Category spending data:', categorySpendingData);
       } else {
-        console.error('Category spending API returned error:', response.error);
+        console.error('Category spending API returned error:', expenseResponse.error || capexResponse.error);
         setCategorySpending([]);
       }
     } catch (error) {
@@ -520,11 +532,14 @@ export default function Dashboard() {
       
       console.log('Fetching monthly chart data for:', start, 'to', end);
       
-      // Fetch all expense transactions for chart analysis
-      const response = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      // Fetch all expense and capex transactions for chart analysis
+      const expenseResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      const capexResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=capex&limit=999999`);
       
-      if (response.transactions) {
-        const transactions = response.transactions || [];
+      if (expenseResponse.transactions || capexResponse.transactions) {
+        const expenseTransactions = expenseResponse.transactions || [];
+        const capexTransactions = capexResponse.transactions || [];
+        const transactions = [...expenseTransactions, ...capexTransactions];
         
         // Group transactions by month and category
         const monthlyData = new Map<string, Map<string, { amount: number; color: string }>>();
@@ -592,7 +607,7 @@ export default function Dashboard() {
         console.log('Monthly chart data:', chartData);
         console.log('Chart categories:', topCategories);
       } else {
-        console.error('Monthly chart API returned error:', response.error);
+        console.error('Monthly chart API returned error:', expenseResponse.error || capexResponse.error);
         setMonthlyChartData([]);
         setChartCategories([]);
       }
@@ -725,6 +740,13 @@ export default function Dashboard() {
       bgColor: "bg-red-50"
     },
     {
+      title: "Capital Expenditure",
+      amount: formatCurrency(dashboardData.totalCapex),
+      icon: Building,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50"
+    },
+    {
       title: "Net Income",
       amount: formatCurrency(dashboardData.netIncome),
       icon: DollarSign,
@@ -851,7 +873,7 @@ export default function Dashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {summaryCards.map((item, index) => (
           <Card key={index} className="relative overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

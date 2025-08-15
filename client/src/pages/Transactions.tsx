@@ -138,7 +138,7 @@ interface Transaction {
   id: number;
   description: string;
   amount: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'capex';
   category_id?: number;
   category_name?: string;
   category_color?: string;
@@ -166,7 +166,7 @@ interface PaginationInfo {
 interface TransactionFormData {
   description: string;
   amount: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'capex';
   category_id?: number;
   date: string;
   source: string;
@@ -875,14 +875,16 @@ export default function Transactions() {
     setEditingTransaction(null);
   };
 
-  const formatAmount = (amount: number, type: 'income' | 'expense') => {
+  const formatAmount = (amount: number, type: 'income' | 'expense' | 'capex') => {
     const isPositive = type === 'income';
     const formatted = Math.abs(amount).toFixed(2);
     return isPositive ? `+$${formatted}` : `-$${formatted}`;
   };
 
-  const getAmountColor = (type: 'income' | 'expense') => {
-    return type === 'income' ? "text-green-600" : "text-foreground";
+  const getAmountColor = (type: 'income' | 'expense' | 'capex') => {
+    if (type === 'income') return "text-green-600";
+    if (type === 'capex') return "text-blue-600";
+    return "text-foreground";
   };
 
   const getCategoryColor = (categoryColor?: string) => {
@@ -1505,13 +1507,14 @@ export default function Transactions() {
               <Label htmlFor="type" className="text-right">
                 Type
               </Label>
-              <Select value={formData.type} onValueChange={(value: 'income' | 'expense') => setFormData(prev => ({ ...prev, type: value }))}>
+              <Select value={formData.type} onValueChange={(value: 'income' | 'expense' | 'capex') => setFormData(prev => ({ ...prev, type: value }))}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="expense">Expense</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="capex">Capital Expenditure</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1614,13 +1617,14 @@ export default function Transactions() {
               <Label htmlFor="edit-type" className="text-right">
                 Type
               </Label>
-              <Select value={formData.type} onValueChange={(value: 'income' | 'expense') => setFormData(prev => ({ ...prev, type: value }))}>
+              <Select value={formData.type} onValueChange={(value: 'income' | 'expense' | 'capex') => setFormData(prev => ({ ...prev, type: value }))}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="expense">Expense</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="capex">Capital Expenditure</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1697,7 +1701,7 @@ export default function Transactions() {
                 value={filterData.type || 'all'} 
                 onValueChange={(value) => setFilterData(prev => ({ 
                   ...prev, 
-                  type: value === 'all' ? undefined : value as 'income' | 'expense' 
+                  type: value === 'all' ? undefined : value as 'income' | 'expense' | 'capex'
                 }))}
               >
                 <SelectTrigger className="col-span-3">
@@ -1707,6 +1711,7 @@ export default function Transactions() {
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="capex">Capital Expenditure</SelectItem>
                 </SelectContent>
               </Select>
             </div>
