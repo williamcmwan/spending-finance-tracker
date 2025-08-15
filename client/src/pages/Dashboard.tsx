@@ -112,6 +112,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { apiClient } from "@/integrations/api/client";
 import { format, subMonths, addMonths, startOfMonth, endOfMonth, subDays, addDays, isWithinInterval, parseISO, startOfYear, endOfYear } from "date-fns";
@@ -181,6 +188,7 @@ export default function Dashboard() {
   const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
   const [monthlyChartData, setMonthlyChartData] = useState<MonthlySpendingData[]>([]);
   const [chartCategories, setChartCategories] = useState<ChartCategoryData[]>([]);
+  const [selectedCategoryCount, setSelectedCategoryCount] = useState<string>("5");
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -207,6 +215,15 @@ export default function Dashboard() {
 
   const getCategoryColor = (color: string) => {
     return color || '#6B7280';
+  };
+
+  const getCategoryDisplayText = (count: string) => {
+    switch (count) {
+      case "all":
+        return "All Categories";
+      default:
+        return `Top ${count} Categories`;
+    }
   };
 
   const getCategoryIcon = (iconName?: string) => {
@@ -497,7 +514,7 @@ export default function Dashboard() {
     }
   };
 
-  const fetchMonthlyChartData = async (range: { from: Date; to: Date }) => {
+  const fetchMonthlyChartData = async (range: { from: Date; to: Date }, categoryCount: string = "5") => {
     try {
       const { start, end } = getDateRange(range);
       
@@ -539,12 +556,15 @@ export default function Dashboard() {
           }
         });
         
-        // Get top 10 categories by total spending
-        const sortedCategories = Array.from(categoryTotals.entries())
-          .sort(([,a], [,b]) => b.total - a.total)
-          .slice(0, 10);
+        // Get top X categories by total spending
+        const allSortedCategories = Array.from(categoryTotals.entries())
+          .sort(([,a], [,b]) => b.total - a.total);
         
-        const top10Categories: ChartCategoryData[] = sortedCategories.map(([name, data]) => ({
+        const categoriesToShow = categoryCount === "all" 
+          ? allSortedCategories 
+          : allSortedCategories.slice(0, parseInt(categoryCount));
+        
+        const topCategories: ChartCategoryData[] = categoriesToShow.map(([name, data]) => ({
           name,
           color: data.color,
           total: data.total
@@ -554,8 +574,8 @@ export default function Dashboard() {
         const chartData: MonthlySpendingData[] = Array.from(monthlyData.entries()).map(([month, categoryMap]) => {
           const monthData: MonthlySpendingData = { month };
           
-          // Add data for each of the top 10 categories
-          top10Categories.forEach(category => {
+          // Add data for each of the selected top categories
+          topCategories.forEach(category => {
             const categoryData = categoryMap.get(category.name);
             monthData[category.name] = categoryData ? categoryData.amount : 0;
           });
@@ -567,10 +587,10 @@ export default function Dashboard() {
         chartData.sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
         
         setMonthlyChartData(chartData);
-        setChartCategories(top10Categories);
+        setChartCategories(topCategories);
         
         console.log('Monthly chart data:', chartData);
-        console.log('Chart categories:', top10Categories);
+        console.log('Chart categories:', topCategories);
       } else {
         console.error('Monthly chart API returned error:', response.error);
         setMonthlyChartData([]);
@@ -596,9 +616,16 @@ export default function Dashboard() {
     // Fetch summary data, category spending, chart data, and initial transactions
     fetchSummaryData(dateRange);
     fetchCategorySpending(dateRange);
-    fetchMonthlyChartData(dateRange);
+    fetchMonthlyChartData(dateRange, selectedCategoryCount);
     fetchTransactions(dateRange, 1, true);
   }, [dateRange]);
+
+  // Update chart when category count selection changes
+  useEffect(() => {
+    if (dateRange.from && dateRange.to) {
+      fetchMonthlyChartData(dateRange, selectedCategoryCount);
+    }
+  }, [selectedCategoryCount]);
 
   // Intersection Observer for lazy loading
   const lastTransactionElementRef = useCallback((node: HTMLTableRowElement | null) => {
@@ -852,9 +879,23 @@ export default function Dashboard() {
       {/* Monthly Spending Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            Monthly Spending Trends - Top 10 Categories
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Monthly Spending Trends - {getCategoryDisplayText(selectedCategoryCount)}
+            </CardTitle>
+            <Select value={selectedCategoryCount} onValueChange={setSelectedCategoryCount}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Top 3</SelectItem>
+                <SelectItem value="5">Top 5</SelectItem>
+                <SelectItem value="8">Top 8</SelectItem>
+                <SelectItem value="10">Top 10</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
