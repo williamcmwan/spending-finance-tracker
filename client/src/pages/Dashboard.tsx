@@ -1267,12 +1267,12 @@ export default function Dashboard() {
                         return (
                           <TableCell key={month} className="px-1 py-2 text-right">
                             {data && data.amount > 0 ? (
-                              <div className="relative group">
+                              <div className="relative group inline-block">
                                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer">
                                   ${data.amount.toFixed(0)}
                                 </span>
                                 {data.change_direction && data.change_percentage !== undefined && (
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-black text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[1000]">
                                     <div className="flex items-center gap-1">
                                       {data.change_direction === 'up' ? (
                                         <ArrowUp className="w-3 h-3 text-green-400" />
