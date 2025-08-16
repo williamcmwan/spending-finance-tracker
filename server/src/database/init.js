@@ -8,12 +8,16 @@ const __dirname = dirname(__filename);
 
 // Ensure data directory exists
 import fs from 'fs';
-const dataDir = path.join(__dirname, '../../data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
 
-const dbPath = path.join(dataDir, 'spending.db');
+// Get database path from environment or use default
+const defaultDataDir = path.join(__dirname, '../../data');
+const dbPath = process.env.DATABASE_PATH || path.join(defaultDataDir, 'spending.db');
+
+// Ensure the directory for the database exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // Create database connection
 export const db = new sqlite3.Database(dbPath, (err) => {

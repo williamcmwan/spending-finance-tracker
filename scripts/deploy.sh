@@ -75,15 +75,78 @@ setup_environment() {
     if [ ! -f server/.env ]; then
         print_status "Creating server environment file..."
         cp server/env.example server/.env
-        print_warning "Created server/.env. Please update with your configuration."
+        
+        # Set production database path
+        print_status "Configuring production database path..."
+        if [ -w "/var/lib" ]; then
+            # System-wide data directory (preferred for production)
+            PROD_DB_PATH="/var/lib/spending-tracker/spending.db"
+            mkdir -p "/var/lib/spending-tracker"
+        elif [ -w "/opt" ]; then
+            # Application directory
+            PROD_DB_PATH="/opt/spending-tracker/data/spending.db"
+            mkdir -p "/opt/spending-tracker/data"
+        else
+            # User directory fallback
+            PROD_DB_PATH="$HOME/spending-tracker/data/spending.db"
+            mkdir -p "$HOME/spending-tracker/data"
+        fi
+        
+        # Update the .env file with production database path
+        sed -i.bak "s|DATABASE_PATH=.*|DATABASE_PATH=$PROD_DB_PATH|" server/.env
+        
+        # Set production environment
+        sed -i.bak "s|NODE_ENV=.*|NODE_ENV=production|" server/.env
+        
+        # Get local IP address for CORS configuration (macOS compatible)
+        LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+        
+        if [ -n "$LOCAL_IP" ]; then
+            # Update CORS origins to include local network IP
+            CORS_ORIGINS="http://localhost:5173,http://localhost:4173,http://$LOCAL_IP:4173,http://$LOCAL_IP:5173"
+            sed -i.bak "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=$CORS_ORIGINS|" server/.env
+            print_status "Configured CORS for local network IP: $LOCAL_IP"
+        fi
+        
+        print_warning "Created server/.env with production database path: $PROD_DB_PATH"
+        print_warning "Please update server/.env with your production configuration."
     fi
     
     print_success "Environment setup completed"
 }
 
+# Function to backup database
+backup_database() {
+    print_status "Checking for database backup..."
+    
+    # Source the environment file to get DATABASE_PATH
+    if [ -f server/.env ]; then
+        export $(grep -v '^#' server/.env | xargs)
+        
+        if [ -n "$DATABASE_PATH" ] && [ -f "$DATABASE_PATH" ]; then
+            local backup_dir="$(dirname "$DATABASE_PATH")/backups"
+            local backup_file="$backup_dir/spending-$(date +%Y%m%d-%H%M%S).db"
+            
+            mkdir -p "$backup_dir"
+            cp "$DATABASE_PATH" "$backup_file"
+            
+            print_success "Database backed up to: $backup_file"
+            
+            # Keep only last 5 backups
+            ls -t "$backup_dir"/spending-*.db | tail -n +6 | xargs -r rm
+            print_status "Old backups cleaned (keeping last 5)"
+        else
+            print_status "No existing database found, skipping backup"
+        fi
+    fi
+}
+
 # Function to build application
 build_application() {
     print_status "Building application..."
+    
+    # Backup existing database before migration
+    backup_database
     
     # Build client
     print_status "Building client..."
