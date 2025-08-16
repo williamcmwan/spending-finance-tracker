@@ -185,9 +185,13 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<{
     from: Date;
     to: Date;
-  }>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
+  }>(() => {
+    const lastMonth = subMonths(new Date(), 1);
+    const sixMonthsAgo = subMonths(lastMonth, 5);
+    return {
+      from: startOfMonth(sixMonthsAgo),
+      to: endOfMonth(lastMonth)
+    };
   });
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalIncome: 0,
@@ -208,6 +212,7 @@ export default function Dashboard() {
   const [monthlyChartData, setMonthlyChartData] = useState<MonthlySpendingData[]>([]);
   const [chartCategories, setChartCategories] = useState<ChartCategoryData[]>([]);
   const [selectedCategoryCount, setSelectedCategoryCount] = useState<string>("5");
+  const [currentMonthPage, setCurrentMonthPage] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -216,6 +221,42 @@ export default function Dashboard() {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
+  };
+
+  // Helper function to get months for current page
+  const getCurrentMonths = () => {
+    if (monthlyCategorySpending.length === 0) return [];
+    
+    const allMonths = Object.keys(monthlyCategorySpending[0].monthly_amounts);
+    const startIndex = currentMonthPage * 8;
+    const endIndex = startIndex + 8;
+    return allMonths.slice(startIndex, endIndex);
+  };
+
+  // Helper function to get total number of month pages
+  const getTotalMonthPages = () => {
+    if (monthlyCategorySpending.length === 0) return 0;
+    const allMonths = Object.keys(monthlyCategorySpending[0].monthly_amounts);
+    return Math.ceil(allMonths.length / 8);
+  };
+
+  // Initialize to last page when data loads
+  useEffect(() => {
+    if (monthlyCategorySpending.length > 0) {
+      const totalPages = getTotalMonthPages();
+      if (totalPages > 0) {
+        setCurrentMonthPage(totalPages - 1);
+      }
+    }
+  }, [monthlyCategorySpending]);
+
+  // Navigation functions
+  const goToPreviousMonths = () => {
+    setCurrentMonthPage(prev => Math.max(0, prev - 1));
+  };
+
+  const goToNextMonths = () => {
+    setCurrentMonthPage(prev => Math.min(getTotalMonthPages() - 1, prev + 1));
   };
 
   const formatPercentage = (value: number) => {
@@ -570,7 +611,7 @@ export default function Dashboard() {
             return;
           }
           
-          const monthKey = format(new Date(transaction.date), 'MMM');
+          const monthKey = format(new Date(transaction.date), 'MMM yyyy');
           const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
           
@@ -599,10 +640,21 @@ export default function Dashboard() {
           });
         });
         
-        const sortedMonths = Array.from(allMonths).sort((a, b) => {
-          const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          return monthOrder.indexOf(a) - monthOrder.indexOf(b);
+        // Sort months chronologically by parsing the month from transactions
+        const monthsWithDates = Array.from(allMonths).map(monthKey => {
+          // Find a transaction from this month to get the actual date
+          const transactionFromMonth = transactions.find((t: Transaction) => {
+            return format(new Date(t.date), 'MMM yyyy') === monthKey;
+          });
+          return {
+            monthKey,
+            date: transactionFromMonth ? new Date(transactionFromMonth.date) : new Date()
+          };
         });
+
+        const sortedMonths = monthsWithDates
+          .sort((a, b) => a.date.getTime() - b.date.getTime())
+          .map(item => item.monthKey);
         
         categoryMonthlyData.forEach(categoryData => {
           const monthly_amounts: { [monthKey: string]: { amount: number; change_percentage?: number; change_direction?: 'up' | 'down' | 'same' } } = {};
@@ -772,6 +824,7 @@ export default function Dashboard() {
     setMonthlyCategorySpending([]);
     setMonthlyChartData([]);
     setChartCategories([]);
+    setCurrentMonthPage(0);
     
     // Fetch summary data, category spending, monthly category spending, chart data, and initial transactions
     fetchSummaryData(dateRange);
@@ -1120,7 +1173,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Category Spending Analysis */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>
             Spending by Category (Expenses Only) - {dateRange.from && dateRange.to ? (
@@ -1130,7 +1183,7 @@ export default function Dashboard() {
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-muted-foreground">Loading category data...</div>
@@ -1140,24 +1193,57 @@ export default function Dashboard() {
               <div className="text-muted-foreground">No expense data found for this period</div>
             </div>
           ) : (
-            <Table className="table-fixed w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-32 px-2">Category</TableHead>
-                  {/* Dynamic month headers */}
-                  {monthlyCategorySpending.length > 0 && 
-                    Object.keys(monthlyCategorySpending[0].monthly_amounts).map(month => (
-                      <TableHead key={month} className="text-center px-1 w-16 text-xs">{month}</TableHead>
-                    ))
-                  }
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <div className="space-y-4">
+              {/* Month Navigation */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToPreviousMonths}
+                    disabled={currentMonthPage === 0}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToNextMonths}
+                    disabled={currentMonthPage >= getTotalMonthPages() - 1}
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {getCurrentMonths().length > 0 && (
+                    `${getCurrentMonths()[0]} - ${getCurrentMonths()[getCurrentMonths().length - 1]} (Page ${currentMonthPage + 1} of ${getTotalMonthPages()})`
+                  )}
+                </div>
+              </div>
+
+              {/* Table */}
+              <Table className="w-full text-sm">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-sm px-2 py-2 w-32">Category</TableHead>
+                    {/* Dynamic month headers - show current 8 months */}
+                    {getCurrentMonths().map(month => (
+                      <TableHead key={month} className="text-right text-sm px-1 py-2">
+                        <div className="truncate" title={month}>
+                          {month}
+                        </div>
+                      </TableHead>
+                    ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                 {monthlyCategorySpending.map((category) => {
                   const IconComponent = getCategoryIcon(category.category_icon);
                   return (
                     <TableRow key={category.category_name}>
-                      <TableCell className="py-2 px-2">
+                      <TableCell className="px-2 py-2">
                         <div className="flex items-center gap-2">
                           {category.category_icon ? (
                             <IconComponent 
@@ -1166,52 +1252,58 @@ export default function Dashboard() {
                             />
                           ) : (
                             <div
-                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              className="w-3 h-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: getCategoryColor(category.category_color) }}
                             />
                           )}
-                          <div className="font-medium text-sm truncate">{category.category_name}</div>
+                          <div className="text-sm font-medium truncate" title={category.category_name}>
+                            {category.category_name}
+                          </div>
                         </div>
                       </TableCell>
-                      {/* Dynamic month data */}
-                      {Object.entries(category.monthly_amounts).map(([month, data]) => (
-                        <TableCell key={month} className="py-2 px-1 text-center">
-                          {data.amount > 0 ? (
-                            <div className="relative group">
-                              <span className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer text-xs">
-                                ${data.amount >= 1000 ? (data.amount / 1000).toFixed(1) + 'k' : data.amount.toFixed(0)}
-                              </span>
-                              {data.change_direction && data.change_percentage !== undefined && (
-                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-black text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                                  <div className="flex items-center gap-1">
-                                    {data.change_direction === 'up' ? (
-                                      <ArrowUp className="w-3 h-3 text-green-400" />
-                                    ) : data.change_direction === 'down' ? (
-                                      <ArrowDown className="w-3 h-3 text-red-400" />
-                                    ) : null}
-                                    <span className={`${
-                                      data.change_direction === 'up' ? 'text-green-400' : 
-                                      data.change_direction === 'down' ? 'text-red-400' : 
-                                      'text-gray-300'
-                                    }`}>
-                                      {data.change_percentage.toFixed(0)}% vs prev month
-                                    </span>
+                      {/* Dynamic month data - show current 8 months only */}
+                      {getCurrentMonths().map(month => {
+                        const data = category.monthly_amounts[month];
+                        return (
+                          <TableCell key={month} className="px-1 py-2 text-right">
+                            {data && data.amount > 0 ? (
+                              <div className="relative group">
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer">
+                                  ${data.amount.toFixed(0)}
+                                </span>
+                                {data.change_direction && data.change_percentage !== undefined && (
+                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-black text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                    <div className="flex items-center gap-1">
+                                      {data.change_direction === 'up' ? (
+                                        <ArrowUp className="w-3 h-3 text-green-400" />
+                                      ) : data.change_direction === 'down' ? (
+                                        <ArrowDown className="w-3 h-3 text-red-400" />
+                                      ) : null}
+                                      <span className={`${
+                                        data.change_direction === 'up' ? 'text-green-400' : 
+                                        data.change_direction === 'down' ? 'text-red-400' : 
+                                        'text-gray-300'
+                                      }`}>
+                                        {data.change_percentage.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                    {/* Tooltip arrow */}
+                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-black"></div>
                                   </div>
-                                  {/* Tooltip arrow */}
-                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-black"></div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs">-</span>
-                          )}
-                        </TableCell>
-                      ))}
-                      </TableRow>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
                     );
                   })}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+            </div>
           )}
         </CardContent>
       </Card>
