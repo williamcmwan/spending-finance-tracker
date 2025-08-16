@@ -22,13 +22,17 @@ spending-finance-tracker/
 │   │   └── routes/        # API routes
 │   ├── data/              # SQLite database files
 │   └── package.json       # Server dependencies
-├── scripts/               # Deployment and setup scripts
-│   ├── deploy.sh          # Deployment script
-│   ├── deploy-test.sh     # Test deployment script
+├── scripts/               # Deployment and management scripts
+│   ├── deploy.sh          # Unified deployment script
+│   ├── app.sh             # Application management script
 │   └── setup.sh           # Development setup script
+├── logs/                  # Application logs (created at runtime)
+│   ├── server.log         # Server logs
+│   └── client.log         # Client logs
 ├── docs/                  # Documentation
-│   ├── DEPLOYMENT.md      # Detailed deployment guide
-│   └── TEST_DEPLOYMENT.md # Test deployment guide
+│   ├── DEPLOYMENT.md      # Deployment guide
+│   ├── MIGRATION_GUIDE.md # Migration guide
+│   └── PRODUCTION_DATABASE.md # Database guide
 ├── package.json           # Root package.json (monorepo)
 └── README.md              # This file
 ```
@@ -63,6 +67,58 @@ npm run dev
 - Frontend: http://localhost:4173
 - Backend API: http://localhost:3001
 - Health check: http://localhost:3001/health
+
+## 🚀 Production Deployment
+
+### Quick Production Setup
+
+1. **Deploy the application:**
+```bash
+./scripts/deploy.sh -e production
+```
+
+2. **Start the application:**
+```bash
+./scripts/app.sh start
+```
+
+3. **Check status:**
+```bash
+./scripts/app.sh status
+```
+
+### Application Management
+
+```bash
+# Start both server and client
+./scripts/app.sh start
+
+# Stop everything
+./scripts/app.sh stop
+
+# Restart after changes
+./scripts/app.sh restart
+
+# View logs
+./scripts/app.sh logs
+
+# Check status
+./scripts/app.sh status
+```
+
+### Environment Configuration
+
+The deployment script automatically detects your environment from `server/.env`:
+
+```bash
+# Production
+NODE_ENV=production
+
+# Development  
+NODE_ENV=development
+```
+
+For detailed deployment instructions, see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## 🛠️ Technology Stack
 

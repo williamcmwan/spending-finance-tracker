@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Spending Finance Tracker Deployment Script
-# This script deploys the application to production
+# Spending Finance Tracker Unified Deployment Script
+# This script deploys the application for both development and production
+# Environment is determined by the .env file configuration
 
 set -e  # Exit on any error
 
@@ -61,58 +62,81 @@ check_prerequisites() {
     print_success "All prerequisites are installed"
 }
 
-# Function to setup environment
-setup_environment() {
-    print_status "Setting up environment..."
+# Function to detect environment from .env file
+detect_environment() {
+    local env_file="server/.env"
     
-    # Create environment files if they don't exist
-    if [ ! -f client/.env ]; then
-        print_status "Creating client environment file..."
-        cp client/env.example client/.env
-        print_warning "Created client/.env. Please update with your configuration."
+    if [ ! -f "$env_file" ]; then
+        print_warning "No server/.env file found. Assuming development environment."
+        echo "development"
+        return
     fi
     
+    # Check NODE_ENV in .env file
+    local node_env=$(grep "^NODE_ENV=" "$env_file" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" | xargs)
+    
+    if [ -n "$node_env" ]; then
+        echo "$node_env"
+    else
+        print_warning "NODE_ENV not found in .env file. Assuming development environment."
+        echo "development"
+    fi
+}
+
+# Function to setup environment files
+setup_environment() {
+    local environment="$1"
+    print_status "Setting up environment for: $environment"
+    
+    # Create client environment file if it doesn't exist
+    if [ ! -f client/.env ]; then
+        print_status "Creating client environment file..."
+        if [ "$environment" = "production" ]; then
+            # Get local IP for production
+            LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+            if [ -n "$LOCAL_IP" ]; then
+                cat > client/.env << EOF
+# Production Client Configuration
+VITE_API_URL=http://$LOCAL_IP:3001/api
+EOF
+                print_status "Created client/.env with production API URL: http://$LOCAL_IP:3001/api"
+            else
+                cp client/env.example client/.env 2>/dev/null || echo "VITE_API_URL=http://localhost:3001/api" > client/.env
+                print_warning "Could not detect IP. Created client/.env with localhost. Please update manually."
+            fi
+        else
+            cp client/env.example client/.env 2>/dev/null || echo "VITE_API_URL=http://localhost:3001/api" > client/.env
+            print_status "Created client/.env for development"
+        fi
+    fi
+    
+    # Create server environment file if it doesn't exist
     if [ ! -f server/.env ]; then
         print_status "Creating server environment file..."
         cp server/env.example server/.env
         
-        # Set production database path
-        print_status "Configuring production database path..."
-        if [ -w "/var/lib" ]; then
-            # System-wide data directory (preferred for production)
-            PROD_DB_PATH="/var/lib/spending-tracker/spending.db"
-            mkdir -p "/var/lib/spending-tracker"
-        elif [ -w "/opt" ]; then
-            # Application directory
-            PROD_DB_PATH="/opt/spending-tracker/data/spending.db"
-            mkdir -p "/opt/spending-tracker/data"
+        if [ "$environment" = "production" ]; then
+            # Configure for production
+            sed -i.bak "s|NODE_ENV=.*|NODE_ENV=production|" server/.env
+            sed -i.bak "s|DATABASE_PATH=.*|DATABASE_PATH=./data/spending.db|" server/.env
+            
+            # Set production CORS
+            LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+            if [ -n "$LOCAL_IP" ]; then
+                CORS_ORIGINS="http://localhost:5173,http://localhost:4173,http://$LOCAL_IP:4173,http://$LOCAL_IP:5173"
+                sed -i.bak "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=$CORS_ORIGINS|" server/.env
+                print_status "Configured CORS for production with IP: $LOCAL_IP"
+            fi
         else
-            # User directory fallback
-            PROD_DB_PATH="$HOME/spending-tracker/data/spending.db"
-            mkdir -p "$HOME/spending-tracker/data"
+            # Configure for development/test
+            sed -i.bak "s|NODE_ENV=.*|NODE_ENV=development|" server/.env
+            sed -i.bak "s|DATABASE_PATH=.*|DATABASE_PATH=./data/spending.db|" server/.env
         fi
         
-        # Update the .env file with production database path
-        sed -i.bak "s|DATABASE_PATH=.*|DATABASE_PATH=$PROD_DB_PATH|" server/.env
-        
-        # Set production environment
-        sed -i.bak "s|NODE_ENV=.*|NODE_ENV=production|" server/.env
-        
-        # Get local IP address for CORS configuration (macOS compatible)
-        LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
-        
-        if [ -n "$LOCAL_IP" ]; then
-            # Update CORS origins to include local network IP
-            CORS_ORIGINS="http://localhost:4173,http://$LOCAL_IP:4173"
-            sed -i.bak "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=$CORS_ORIGINS|" server/.env
-            print_status "Configured CORS for local network IP: $LOCAL_IP"
-        fi
-        
-        print_warning "Created server/.env with production database path: $PROD_DB_PATH"
-        print_warning "Please update server/.env with your production configuration."
+        print_warning "Created server/.env. Please update with your configuration."
     fi
     
-    print_success "Environment setup completed"
+    print_success "Environment setup completed for: $environment"
 }
 
 # Function to backup database
@@ -133,7 +157,7 @@ backup_database() {
             print_success "Database backed up to: $backup_file"
             
             # Keep only last 5 backups
-            ls -t "$backup_dir"/spending-*.db | tail -n +6 | xargs -r rm
+            ls -t "$backup_dir"/spending-*.db 2>/dev/null | tail -n +6 | xargs -r rm
             print_status "Old backups cleaned (keeping last 5)"
         else
             print_status "No existing database found, skipping backup"
@@ -143,31 +167,37 @@ backup_database() {
 
 # Function to build application
 build_application() {
-    print_status "Building application..."
+    local environment="$1"
+    print_status "Building application for: $environment"
     
-    # Backup existing database before migration
+    # Backup existing database before any changes
     backup_database
     
     # Build client
     print_status "Building client..."
     cd client
     npm install
-    npm run build:prod
+    
+    if [ "$environment" = "production" ]; then
+        npm run build:prod
+    else
+        npm run build
+    fi
     cd ..
     
     # Prepare server
     print_status "Preparing server..."
     cd server
     npm install
-    npm run migrate
     cd ..
     
-    print_success "Build completed successfully"
+    print_success "Build completed successfully for: $environment"
 }
 
 # Function to deploy to Vercel
 deploy_vercel() {
-    print_status "Deploying to Vercel..."
+    local environment="$1"
+    print_status "Deploying to Vercel ($environment)..."
     
     if ! command_exists vercel; then
         print_error "Vercel CLI not found. Please install it with: npm i -g vercel"
@@ -177,9 +207,13 @@ deploy_vercel() {
     
     cd client
     
-    # Deploy to Vercel
-    print_status "Deploying client to Vercel..."
-    vercel --prod
+    if [ "$environment" = "production" ]; then
+        print_status "Deploying to Vercel production..."
+        vercel --prod
+    else
+        print_status "Deploying to Vercel preview..."
+        vercel
+    fi
     
     cd ..
     
@@ -189,38 +223,16 @@ deploy_vercel() {
 
 # Function to deploy locally
 deploy_local() {
-    print_status "Setting up local deployment..."
+    local environment="$1"
+    print_status "Setting up local deployment ($environment)..."
     
     # Build the application
-    build_application
+    build_application "$environment"
     
-    # Start servers
-    print_status "Starting servers..."
-    
-    # Start server in background
-    cd server
-    print_status "Starting server on port 3001..."
-    npm start &
-    SERVER_PID=$!
-    cd ..
-    
-    # Wait a moment for server to start
-    sleep 3
-    
-    # Start client
-    cd client
-    print_status "Starting client on port 5173..."
-    npm run preview &
-    CLIENT_PID=$!
-    cd ..
-    
-    print_success "Local deployment started!"
-    print_status "Server: http://localhost:3001"
-    print_status "Client: http://localhost:4173 (Vite preview)"
-    print_status "Press Ctrl+C to stop all servers"
-    
-    # Wait for user to stop
-    wait
+    print_success "Local deployment setup completed for: $environment"
+    print_status "Use './scripts/app.sh start' to start the application"
+    print_status "Use './scripts/app.sh stop' to stop the application"
+    print_status "Use './scripts/app.sh restart' to restart the application"
 }
 
 # Function to show usage
@@ -229,17 +241,23 @@ show_usage() {
     echo ""
     echo "Options:"
     echo "  -p, --platform PLATFORM  Deployment platform (vercel|local) [default: local]"
+    echo "  -e, --env ENVIRONMENT     Force environment (development|production) [default: auto-detect from .env]"
     echo "  -s, --setup              Setup environment only"
     echo "  -b, --build              Build application only"
     echo "  -h, --help               Show this help message"
     echo ""
     echo "Platforms:"
     echo "  local                    Deploy locally"
-    echo "  vercel                   Deploy to Vercel (recommended)"
+    echo "  vercel                   Deploy to Vercel"
+    echo ""
+    echo "Environment Detection:"
+    echo "  The script automatically detects the environment from server/.env NODE_ENV setting."
+    echo "  Use -e flag to override auto-detection."
     echo ""
     echo "Examples:"
-    echo "  $0                        # Deploy locally"
-    echo "  $0 -p vercel             # Deploy to Vercel"
+    echo "  $0                        # Auto-detect environment, deploy locally"
+    echo "  $0 -p vercel             # Auto-detect environment, deploy to Vercel"
+    echo "  $0 -e production         # Force production environment, deploy locally"
     echo "  $0 -s                    # Setup environment only"
     echo "  $0 -b                    # Build application only"
 }
@@ -247,6 +265,7 @@ show_usage() {
 # Main deployment function
 main() {
     local platform="local"
+    local environment=""
     local setup_only=false
     local build_only=false
     
@@ -255,6 +274,10 @@ main() {
         case $1 in
             -p|--platform)
                 platform="$2"
+                shift 2
+                ;;
+            -e|--env)
+                environment="$2"
                 shift 2
                 ;;
             -s|--setup)
@@ -283,14 +306,26 @@ main() {
         exit 1
     fi
     
+    # Detect environment if not specified
+    if [ -z "$environment" ]; then
+        environment=$(detect_environment)
+    fi
+    
+    # Validate environment
+    if [[ "$environment" != "development" && "$environment" != "production" && "$environment" != "test" ]]; then
+        print_error "Invalid environment: $environment. Use 'development', 'production', or 'test'"
+        exit 1
+    fi
+    
     print_status "Starting deployment..."
     print_status "Platform: $platform"
+    print_status "Environment: $environment"
     
     # Check prerequisites
     check_prerequisites
     
     # Setup environment
-    setup_environment
+    setup_environment "$environment"
     
     if [ "$setup_only" = true ]; then
         print_success "Environment setup completed!"
@@ -298,7 +333,7 @@ main() {
     fi
     
     # Build application
-    build_application
+    build_application "$environment"
     
     if [ "$build_only" = true ]; then
         print_success "Build completed!"
@@ -308,14 +343,16 @@ main() {
     # Deploy based on platform
     case $platform in
         "vercel")
-            deploy_vercel
+            deploy_vercel "$environment"
             ;;
         "local")
-            deploy_local
+            deploy_local "$environment"
             ;;
     esac
     
     print_success "Deployment completed successfully!"
+    print_status "Environment: $environment"
+    print_status "Platform: $platform"
 }
 
 # Run main function with all arguments

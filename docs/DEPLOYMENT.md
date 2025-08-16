@@ -1,248 +1,422 @@
-# Deployment Guide
+# 🚀 Deployment Guide
 
-This guide covers deploying the Spending Finance Tracker application to production with comprehensive category management and drag-and-drop import functionality.
+## 📋 Overview
 
-## Quick Start
+This guide covers deployment of the Spending Finance Tracker using the unified deployment system. The application supports both development and production environments, automatically detected from your `.env` configuration.
 
-### Local Development
+## 🎯 Quick Start
+
+### 1. **Basic Deployment**
 ```bash
-# Setup environment
-./scripts/setup.sh
+# Auto-detect environment and deploy locally
+./scripts/deploy.sh
 
-# Start development servers
-npm run dev
+# Start the application
+./scripts/app.sh start
+
+# Check status
+./scripts/app.sh status
 ```
 
-### Production Deployment (Vercel)
+### 2. **Environment-Specific Deployment**
 ```bash
+# Force production environment
+./scripts/deploy.sh -e production
+
+# Force development environment  
+./scripts/deploy.sh -e development
+
 # Deploy to Vercel
 ./scripts/deploy.sh -p vercel
 ```
 
-## Prerequisites
+## 🔧 Environment Configuration
 
-- Node.js (v18 or higher)
-- npm
-- Git
-- Vercel CLI (for production deployment): `npm i -g vercel`
+### **Environment Detection**
+The deployment script automatically detects your environment from `server/.env`:
 
-## Environment Setup
-
-### Client Environment (`client/.env`)
-```env
-# Client Environment Variables
-VITE_API_URL=http://localhost:3001/api
-```
-
-### Server Environment (`server/.env`)
-```env
-# Server Configuration
-PORT=3001
+```bash
+# Production
 NODE_ENV=production
 
-# JWT Configuration
-JWT_SECRET=your_jwt_secret_key_here_change_this_in_production
+# Development
+NODE_ENV=development
 
-# Session Configuration
-SESSION_SECRET=your_session_secret_here_change_this_in_production
+# Test
+NODE_ENV=test
+```
 
-# Google OAuth Configuration (Optional - leave empty to disable Google login)
-GOOGLE_CLIENT_ID=your_google_client_id_here
-GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-GOOGLE_CALLBACK_URL=https://your-domain.com/api/auth/google/callback
+### **Environment Files**
 
-# Client Configuration
-CLIENT_URL=https://your-domain.com
+#### **Server Configuration (`server/.env`)**
+```bash
+# Environment
+NODE_ENV=production
 
-# Database Configuration (SQLite)
+# Server
+PORT=3001
+
+# Security
+JWT_SECRET=your_production_jwt_secret
+SESSION_SECRET=your_production_session_secret
+
+# Database
 DATABASE_PATH=./data/spending.db
 
-# CORS Configuration
-ALLOWED_ORIGINS=https://your-domain.com,http://localhost:5173
+# CORS (auto-configured for production)
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173,http://192.168.1.100:4173
 ```
 
-## Deployment Options
-
-### 1. Local Development
-
-**Best for:** Development and testing
-
+#### **Client Configuration (`client/.env`)**
 ```bash
-# Setup environment
-./scripts/setup.sh
-
-# Start development servers
-npm run dev
+# API URL (auto-configured based on environment)
+VITE_API_URL=http://localhost:3001/api          # Development
+VITE_API_URL=http://192.168.1.100:3001/api     # Production (auto-detected IP)
 ```
 
-**Access your app:**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3001
-- Health check: http://localhost:3001/health
+## 📦 Deployment Scripts
 
-### 2. Vercel Deployment
+### **1. Unified Deploy Script (`./scripts/deploy.sh`)**
 
-**Best for:** Production deployment
-
+#### **Usage**
 ```bash
-# Deploy to Vercel
+./scripts/deploy.sh [OPTIONS]
+
+Options:
+  -p, --platform PLATFORM  Deployment platform (vercel|local) [default: local]
+  -e, --env ENVIRONMENT     Force environment (development|production) [default: auto-detect]
+  -s, --setup              Setup environment only
+  -b, --build              Build application only
+  -h, --help               Show help message
+```
+
+#### **Examples**
+```bash
+# Auto-detect environment, deploy locally
+./scripts/deploy.sh
+
+# Force production, deploy locally
+./scripts/deploy.sh -e production
+
+# Deploy to Vercel with auto-detected environment
 ./scripts/deploy.sh -p vercel
+
+# Setup environment files only
+./scripts/deploy.sh -s
+
+# Build application only
+./scripts/deploy.sh -b
 ```
 
-**Prerequisites:**
-1. Install Vercel CLI: `npm i -g vercel`
-2. Login to Vercel: `vercel login`
+#### **What It Does**
+1. ✅ **Detects environment** from `server/.env`
+2. ✅ **Creates environment files** if missing
+3. ✅ **Configures CORS** automatically for production
+4. ✅ **Backs up database** before changes
+5. ✅ **Builds application** for target environment
+6. ✅ **Prepares for deployment** or deploys to Vercel
 
-**What happens:**
-- Builds the client for production
-- Deploys to Vercel with a unique URL
-- Provides you with a live URL
+### **2. Application Management Script (`./scripts/app.sh`)**
 
-**Benefits:**
-- ✅ Instant deployment
-- ✅ HTTPS by default
-- ✅ Global CDN
-- ✅ Automatic preview URLs
-- ✅ Easy rollbacks
-
-## Manual Deployment Steps
-
-If you prefer to deploy manually:
-
-### Local Deployment
+#### **Usage**
 ```bash
-# Setup environment
-./scripts/setup.sh
+./scripts/app.sh COMMAND [COMPONENT] [OPTIONS]
 
-# Build application
-npm run build
-
-# Start servers manually
-cd server && npm start &
-cd client && npm run preview &
+Commands:
+  start [server|client|all]    Start application components [default: all]
+  stop [server|client|all]     Stop application components [default: all]
+  restart [server|client|all]  Restart application components [default: all]
+  status                       Show application status
+  logs [server|client|all] [lines]  Show logs [default: all, 50 lines]
+  help                         Show help message
 ```
 
-### Vercel Deployment
+#### **Examples**
 ```bash
-# Setup and build
-./scripts/setup.sh
-npm run build
+# Start both server and client
+./scripts/app.sh start
 
-# Deploy to Vercel
-cd client
-vercel --prod
+# Start only server
+./scripts/app.sh start server
+
+# Stop everything
+./scripts/app.sh stop
+
+# Restart only client
+./scripts/app.sh restart client
+
+# Check status
+./scripts/app.sh status
+
+# View server logs (last 100 lines)
+./scripts/app.sh logs server 100
+
+# View all logs
+./scripts/app.sh logs
 ```
 
-## Database Setup
+#### **What It Does**
+1. ✅ **Manages background processes** (server & client)
+2. ✅ **Tracks PIDs** for proper process management
+3. ✅ **Logs output** to separate files
+4. ✅ **Graceful shutdown** with fallback to force kill
+5. ✅ **Status monitoring** with real-time information
+6. ✅ **Log viewing** with configurable line counts
 
-### SQLite Setup
+## 🌐 Deployment Scenarios
 
-The application uses SQLite for local data storage. The database is automatically initialized when you run the setup script.
-
-1. **Initialize Database:**
+### **1. Local Development**
 ```bash
-cd server
-npm run migrate
+# Setup
+./scripts/deploy.sh -e development -s
+
+# Build and start
+./scripts/deploy.sh -e development
+./scripts/app.sh start
+
+# Access
+# Client: http://localhost:4173
+# Server: http://localhost:3001
 ```
 
-2. **Reset Database (if needed):**
+### **2. Local Production**
 ```bash
-cd server
-npm run reset
+# Setup
+./scripts/deploy.sh -e production -s
+
+# Build and start
+./scripts/deploy.sh -e production
+./scripts/app.sh start
+
+# Access
+# Client: http://192.168.1.100:4173 (your IP)
+# Server: http://192.168.1.100:3001
 ```
 
-### Database Location
-
-The SQLite database file is stored at:
-```
-server/data/spending.db
-```
-
-### Database Schema
-
-The application includes the following tables:
-- **users** - User accounts and authentication
-- **categories** - Transaction categories  
-- **transactions** - Financial transactions
-
-## Monitoring and Maintenance
-
-### Health Checks
-
-- **Frontend**: Check if the app loads without errors
-- **Backend**: Verify API endpoints respond
-- **Database**: Test data persistence
-- **Authentication**: Test login/logout flows
-
-### Performance Monitoring
-
-- **Load Time**: Check initial page load speed
-- **API Response**: Monitor API response times
-- **Memory Usage**: Watch for memory leaks
-- **Error Rates**: Monitor for 4xx/5xx errors
-
-### Security Testing
-
-- **Authentication**: Test with invalid credentials
-- **Authorization**: Test protected routes
-- **CORS**: Verify cross-origin requests
-- **Environment Variables**: Ensure secrets are not exposed
-
-## Troubleshooting
-
-### Common Issues
-
-**1. Port already in use**
+### **3. Network Production**
 ```bash
-# Kill processes using ports 3001 or 5173
-lsof -ti:3001 | xargs kill -9
-lsof -ti:5173 | xargs kill -9
+# Auto-detects your IP and configures CORS
+./scripts/deploy.sh -e production
+
+# Start services
+./scripts/app.sh start
+
+# Access from any device on network
+# http://YOUR_IP:4173
 ```
 
-**2. Database errors**
+### **4. Vercel Deployment**
 ```bash
-# Reset database
-cd server
-rm -f data/spending.db
-npm run migrate
+# Deploy to Vercel (production)
+./scripts/deploy.sh -p vercel -e production
+
+# Deploy to Vercel (preview)
+./scripts/deploy.sh -p vercel -e development
 ```
 
-**3. Build errors**
+## 🗄️ Database Management
+
+### **Automatic Backup**
+- ✅ **Pre-deployment backup** before any changes
+- ✅ **Timestamped backups** (`spending-YYYYMMDD-HHMMSS.db`)
+- ✅ **Retention policy** (keeps last 5 backups)
+- ✅ **Backup location**: `{DATABASE_DIR}/backups/`
+
+### **Database Location**
+```bash
+# Development/Production
+DATABASE_PATH=./data/spending.db
+
+# Backups
+./data/backups/spending-20241201-143022.db
+```
+
+## 📊 Monitoring & Logs
+
+### **Application Status**
+```bash
+# Check if services are running
+./scripts/app.sh status
+
+# Output example:
+# Application Status
+# Environment: production
+# 
+# Server: Running (PID: 12345)
+#   Log: /path/to/logs/server.log
+#   URL: http://localhost:3001
+# 
+# Client: Running (PID: 12346)
+#   Log: /path/to/logs/client.log
+#   URL: http://localhost:4173
+```
+
+### **Log Files**
+```bash
+# Log locations
+logs/server.log    # Server output
+logs/client.log    # Client output
+
+# View logs
+./scripts/app.sh logs server     # Server logs
+./scripts/app.sh logs client     # Client logs
+./scripts/app.sh logs all        # All logs
+```
+
+### **Process Management**
+```bash
+# PID files (auto-managed)
+server/.server.pid    # Server process ID
+client/.client.pid    # Client process ID
+```
+
+## 🔒 Security Considerations
+
+### **Production Security**
+- ✅ **Strong JWT secrets** (change defaults)
+- ✅ **Secure session secrets** (change defaults)
+- ✅ **CORS configuration** (auto-configured for network)
+- ✅ **Database permissions** (user-only access)
+
+### **Environment Variables**
+```bash
+# Required for production
+JWT_SECRET=your_unique_jwt_secret_here
+SESSION_SECRET=your_unique_session_secret_here
+
+# Optional for enhanced security
+GOOGLE_CLIENT_ID=your_google_oauth_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_secret
+```
+
+## 🚨 Troubleshooting
+
+### **Common Issues**
+
+#### **1. CORS Errors**
+```bash
+# Rebuild with correct environment
+./scripts/deploy.sh -e production -b
+./scripts/app.sh restart
+```
+
+#### **2. Port Already in Use**
+```bash
+# Stop existing processes
+./scripts/app.sh stop
+
+# Check for zombie processes
+ps aux | grep node
+
+# Kill if necessary
+kill -9 PID
+```
+
+#### **3. Database Issues**
+```bash
+# Check database file
+ls -la server/data/spending.db
+
+# Check permissions
+chmod 644 server/data/spending.db
+
+# Restore from backup
+cp server/data/backups/spending-*.db server/data/spending.db
+```
+
+#### **4. Build Failures**
 ```bash
 # Clean and rebuild
-rm -rf client/node_modules client/dist
-rm -rf server/node_modules
-npm install
-npm run build
+rm -rf client/dist server/node_modules client/node_modules
+./scripts/deploy.sh -b
 ```
 
-**4. Vercel deployment fails**
+### **Log Analysis**
 ```bash
-# Check Vercel CLI
-vercel --version
-vercel login
+# Check recent errors
+./scripts/app.sh logs server | grep -i error
+./scripts/app.sh logs client | grep -i error
 
-# Try deployment again
-./scripts/deploy.sh -p vercel
+# Monitor real-time
+tail -f logs/server.log
+tail -f logs/client.log
 ```
 
-### Getting Help
+## 🎯 Best Practices
 
-1. Check the console output for error messages
-2. Verify all environment variables are set correctly
-3. Ensure all prerequisites are installed
-4. Check the server logs at `http://localhost:3001/health`
+### **1. Environment Management**
+- ✅ Use separate `.env` files for different environments
+- ✅ Never commit secrets to version control
+- ✅ Regularly rotate JWT and session secrets
 
-## Best Practices
+### **2. Deployment Workflow**
+```bash
+# 1. Setup environment
+./scripts/deploy.sh -s
 
-1. **Use strong secrets** for JWT and session keys
-2. **Set up proper CORS** for your domain
-3. **Monitor logs** during deployment
-4. **Test all features** after deployment
-5. **Keep backups** of your database
-6. **Use environment-specific configurations**
-7. **Document your deployment process**
+# 2. Build application
+./scripts/deploy.sh -b
 
----
+# 3. Start services
+./scripts/app.sh start
 
-**Happy deploying! 🚀**
+# 4. Monitor status
+./scripts/app.sh status
+```
+
+### **3. Maintenance**
+```bash
+# Regular backup check
+ls -la server/data/backups/
+
+# Log rotation (if needed)
+./scripts/app.sh logs server 1000 > archive/server-$(date +%Y%m%d).log
+
+# Process monitoring
+./scripts/app.sh status
+```
+
+## 🎉 Quick Reference
+
+### **Essential Commands**
+```bash
+# Deploy and start
+./scripts/deploy.sh && ./scripts/app.sh start
+
+# Stop everything
+./scripts/app.sh stop
+
+# Restart after changes
+./scripts/app.sh restart
+
+# Check status
+./scripts/app.sh status
+
+# View logs
+./scripts/app.sh logs
+```
+
+### **File Structure**
+```
+scripts/
+├── deploy.sh          # Unified deployment script
+└── app.sh             # Application management script
+
+logs/
+├── server.log         # Server output
+└── client.log         # Client output
+
+server/
+├── .env               # Server configuration
+├── .server.pid        # Server process ID
+└── data/
+    ├── spending.db    # Main database
+    └── backups/       # Database backups
+
+client/
+├── .env               # Client configuration
+├── .client.pid        # Client process ID
+└── dist/              # Built application
+```
+
+**Your application is now ready for seamless deployment and management! 🚀**
