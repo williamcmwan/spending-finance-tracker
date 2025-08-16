@@ -60,7 +60,7 @@ npm run dev
 ```
 
 4. **Access the application:**
-- Frontend: http://localhost:5173
+- Frontend: http://localhost:4173
 - Backend API: http://localhost:3001
 - Health check: http://localhost:3001/health
 
@@ -239,7 +239,7 @@ JWT_SECRET=your_jwt_secret_key_here
 SESSION_SECRET=your_session_secret_here
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-CLIENT_URL=http://localhost:5173
+CLIENT_URL=http://localhost:4173
 DATABASE_PATH=./data/spending.db
 ```
 
