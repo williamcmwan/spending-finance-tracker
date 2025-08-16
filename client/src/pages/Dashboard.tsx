@@ -1301,6 +1301,31 @@ export default function Dashboard() {
                     </TableRow>
                     );
                   })}
+                  
+                  {/* Total Row */}
+                  <TableRow className="border-t-2 border-gray-300 bg-gray-50 dark:bg-gray-800">
+                    <TableCell className="px-2 py-2 font-bold">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-gray-500 rounded-full flex-shrink-0"></div>
+                        <div className="text-sm font-bold">Total Expenses</div>
+                      </div>
+                    </TableCell>
+                    {/* Calculate and display monthly totals */}
+                    {getCurrentMonths().map(month => {
+                      const monthTotal = monthlyCategorySpending.reduce((total, category) => {
+                        const data = category.monthly_amounts[month];
+                        return total + (data?.amount || 0);
+                      }, 0);
+                      
+                      return (
+                        <TableCell key={month} className="px-1 py-2 text-right font-bold">
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            ${monthTotal.toFixed(0)}
+                          </span>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
                   </TableBody>
                 </Table>
             </div>
