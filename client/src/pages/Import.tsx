@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload,
   FileText,
@@ -11,7 +12,10 @@ import {
   Download,
   X,
   Plus,
-  Trash2
+  Trash2,
+  Building2,
+  Edit3,
+  Check
 } from "lucide-react";
 import {
   Table,
@@ -22,6 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/integrations/api/client";
 
@@ -55,6 +61,27 @@ export default function Import() {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  
+  // BOI Statement import state
+  const [boiImportStatus, setBoiImportStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed'>('idle');
+  const [boiUploadProgress, setBoiUploadProgress] = useState(0);
+  const [boiValidationResults, setBoiValidationResults] = useState<ValidationResult[]>([]);
+  const [selectedBoiTransactions, setSelectedBoiTransactions] = useState<Set<number>>(new Set());
+  const [isBoiDragOver, setIsBoiDragOver] = useState(false);
+  const pdfFileInputRef = useRef<HTMLInputElement>(null);
+  const pdfDropZoneRef = useRef<HTMLDivElement>(null);
+  
+  // Inline editing state for CSV import
+  const [editingCsvTransaction, setEditingCsvTransaction] = useState<number | null>(null);
+  const [csvEditValues, setCsvEditValues] = useState<{[key: number]: {description: string, category: string, type: string}}>({});
+  
+  // Inline editing state for BOI import  
+  const [editingBoiTransaction, setEditingBoiTransaction] = useState<number | null>(null);
+  const [boiEditValues, setBoiEditValues] = useState<{[key: number]: {description: string, category: string, type: string}}>({});
+  
+  // Categories for dropdowns
+  const [categories, setCategories] = useState<string[]>([]);
+  
   const { toast } = useToast();
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -124,6 +151,73 @@ export default function Import() {
     }
   }, [handleFileUpload]);
 
+  // BOI PDF upload handler
+  const handleBoiPdfUpload = useCallback(async (file: File) => {
+    if (!file) return;
+
+    setBoiImportStatus('uploading');
+    setBoiUploadProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('pdfFile', file);
+
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setBoiUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
+
+      const response = await apiClient.request('/import/boi-upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      clearInterval(progressInterval);
+      setBoiUploadProgress(100);
+
+      if (response.success) {
+        setBoiValidationResults(response.validationResults);
+        setBoiImportStatus('completed');
+        
+        // Auto-select valid transactions
+        const validIndices = response.validationResults
+          .filter((result: ValidationResult) => result.status === 'valid')
+          .map((result: ValidationResult) => result.rowIndex);
+        setSelectedBoiTransactions(new Set(validIndices));
+
+        toast({
+          title: "BOI Statement processed successfully",
+          description: `${response.totalTransactions} transactions found`,
+        });
+      } else {
+        throw new Error(response.error || 'Upload failed');
+      }
+    } catch (error: any) {
+      console.error('BOI upload error:', error);
+      setBoiImportStatus('idle');
+      setBoiUploadProgress(0);
+      
+      toast({
+        title: "BOI Statement upload failed",
+        description: error.message || 'Failed to process PDF statement',
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const handlePdfFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleBoiPdfUpload(file);
+    }
+  }, [handleBoiPdfUpload]);
+
   // Drag and drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -163,6 +257,47 @@ export default function Import() {
 
   const handleDropZoneClick = useCallback(() => {
     fileInputRef.current?.click();
+  }, []);
+
+  // BOI PDF drag and drop handlers
+  const handleBoiDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsBoiDragOver(true);
+  }, []);
+
+  const handleBoiDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsBoiDragOver(false);
+  }, []);
+
+  const handleBoiDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleBoiDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsBoiDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const pdfFile = files.find(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+
+    if (pdfFile) {
+      handleBoiPdfUpload(pdfFile);
+    } else {
+      toast({
+        title: "Invalid file type",
+        description: "Please drop a PDF file",
+        variant: "destructive",
+      });
+    }
+  }, [handleBoiPdfUpload, toast]);
+
+  const handlePdfDropZoneClick = useCallback(() => {
+    pdfFileInputRef.current?.click();
   }, []);
 
   const handleDownloadTemplate = async () => {
@@ -281,6 +416,82 @@ export default function Import() {
     }
   };
 
+  // BOI transaction selection handlers
+  const toggleBoiTransactionSelection = (index: number) => {
+    const newSelected = new Set(selectedBoiTransactions);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedBoiTransactions(newSelected);
+  };
+
+  const toggleAllBoiTransactions = () => {
+    if (selectedBoiTransactions.size === boiValidationResults.length) {
+      setSelectedBoiTransactions(new Set());
+    } else {
+      setSelectedBoiTransactions(new Set(boiValidationResults.map((_, index) => index)));
+    }
+  };
+
+  // BOI import handler
+  const handleImportSelectedBoi = async () => {
+    if (selectedBoiTransactions.size === 0) {
+      toast({
+        title: "No transactions selected",
+        description: "Please select transactions to import",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const transactionsToImport = boiValidationResults
+        .filter((result, index) => selectedBoiTransactions.has(index))
+        .map(result => result.data);
+
+      const response = await apiClient.request('/import/boi-import', {
+        method: 'POST',
+        body: JSON.stringify({ transactions: transactionsToImport }),
+      });
+
+      if (response.success) {
+        toast({
+          title: "BOI import successful",
+          description: `${response.importedCount} transactions imported successfully`,
+        });
+        
+        // Reset state
+        setBoiImportStatus('idle');
+        setBoiValidationResults([]);
+        setSelectedBoiTransactions(new Set());
+      } else {
+        throw new Error(response.error || 'Import failed');
+      }
+    } catch (error: any) {
+      console.error('BOI import error:', error);
+      let errorMessage = 'Failed to import transactions';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.details) {
+        errorMessage = error.details;
+      } else if (error.errors && Array.isArray(error.errors)) {
+        const validationErrors = error.errors.map((err: any) => 
+          `${err.path}: ${err.msg}`
+        ).join(', ');
+        errorMessage = `Validation errors: ${validationErrors}`;
+      }
+      
+      toast({
+        title: "BOI import failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'valid':
@@ -300,6 +511,97 @@ export default function Import() {
   const totalTransactions = validationResults.length;
   const selectedCount = selectedTransactions.size;
 
+  const validBoiTransactions = boiValidationResults.filter(t => t.status === 'valid').length;
+  const totalBoiTransactions = boiValidationResults.length;
+  const selectedBoiCount = selectedBoiTransactions.size;
+
+  // Load categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await apiClient.request('/categories', { method: 'GET' });
+        if (response.categories) {
+          setCategories(response.categories.map((cat: any) => cat.name));
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  // CSV Editing functions
+  const startCsvEdit = (index: number, result: ValidationResult) => {
+    setEditingCsvTransaction(index);
+    setCsvEditValues({
+      ...csvEditValues,
+      [index]: {
+        description: result.data.description,
+        category: result.data.category,
+        type: result.data.transactionType
+      }
+    });
+  };
+
+  const saveCsvEdit = (index: number) => {
+    const editedValues = csvEditValues[index];
+    if (editedValues) {
+      // Update the validation results with edited values
+      setValidationResults(prev => prev.map((result, i) => 
+        i === index ? {
+          ...result,
+          data: {
+            ...result.data,
+            description: editedValues.description,
+            category: editedValues.category,
+            transactionType: editedValues.type
+          }
+        } : result
+      ));
+    }
+    setEditingCsvTransaction(null);
+  };
+
+  const cancelCsvEdit = () => {
+    setEditingCsvTransaction(null);
+  };
+
+  // BOI Editing functions
+  const startBoiEdit = (index: number, result: ValidationResult) => {
+    setEditingBoiTransaction(index);
+    setBoiEditValues({
+      ...boiEditValues,
+      [index]: {
+        description: result.data.description,
+        category: result.data.category,
+        type: result.data.type
+      }
+    });
+  };
+
+  const saveBoiEdit = (index: number) => {
+    const editedValues = boiEditValues[index];
+    if (editedValues) {
+      // Update the validation results with edited values
+      setBoiValidationResults(prev => prev.map((result, i) => 
+        i === index ? {
+          ...result,
+          data: {
+            ...result.data,
+            description: editedValues.description,
+            category: editedValues.category,
+            type: editedValues.type
+          }
+        } : result
+      ));
+    }
+    setEditingBoiTransaction(null);
+  };
+
+  const cancelBoiEdit = () => {
+    setEditingBoiTransaction(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -307,24 +609,47 @@ export default function Import() {
         <div>
           <h1 className="text-3xl font-bold">Import Transactions</h1>
           <p className="text-muted-foreground">
-            Import transactions from CSV files with validation
+            Import transactions from CSV files or BOI PDF statements
           </p>
         </div>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleDownloadTemplate}>
-            <Download className="w-4 h-4 mr-2" />
-            Download Template
-          </Button>
-          
-          {importStatus === 'completed' && selectedCount > 0 && (
-            <Button onClick={handleImportSelected}>
-              <Plus className="w-4 h-4 mr-2" />
-              Import {selectedCount} Transactions
-            </Button>
-          )}
-        </div>
       </div>
+
+      <Tabs defaultValue="csv" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="csv" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            CSV Import
+          </TabsTrigger>
+          <TabsTrigger value="boi" className="flex items-center gap-2">
+            <Building2 className="w-4 h-4" />
+            BOI Statement
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="csv" className="space-y-6">
+          {/* Header for CSV */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">CSV File Import</h2>
+              <p className="text-muted-foreground text-sm">
+                Import transactions from CSV files with validation
+              </p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleDownloadTemplate}>
+                <Download className="w-4 h-4 mr-2" />
+                Download Template
+              </Button>
+              
+              {importStatus === 'completed' && selectedCount > 0 && (
+                <Button onClick={handleImportSelected}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Import {selectedCount} Transactions
+                </Button>
+              )}
+            </div>
+          </div>
 
       {/* Upload Section */}
       {importStatus === 'idle' && (
@@ -493,6 +818,7 @@ export default function Import() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Issues</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -513,26 +839,77 @@ export default function Import() {
                         {result.data.date}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {result.data.description}
+                        {editingCsvTransaction === index ? (
+                          <Input
+                            value={csvEditValues[index]?.description || result.data.description}
+                            onChange={(e) => setCsvEditValues({
+                              ...csvEditValues,
+                              [index]: { ...csvEditValues[index], description: e.target.value }
+                            })}
+                            className="w-full"
+                          />
+                        ) : (
+                          result.data.description
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{result.data.category}</Badge>
+                        {editingCsvTransaction === index ? (
+                          <Select
+                            value={csvEditValues[index]?.category || result.data.category}
+                            onValueChange={(value) => setCsvEditValues({
+                              ...csvEditValues,
+                              [index]: { ...csvEditValues[index], category: value }
+                            })}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  {category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant="outline">{result.data.category}</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={
-                            result.data.transactionType === 'income' ? 'secondary' : 
-                            result.data.transactionType === 'capex' ? 'default' : 
-                            'destructive'
-                          }
-                          className={
-                            result.data.transactionType === 'income' ? 'text-green-600 bg-green-50' :
-                            result.data.transactionType === 'capex' ? 'text-blue-600 bg-blue-50' :
-                            'text-red-600 bg-red-50'
-                          }
-                        >
-                          {result.data.transactionType}
-                        </Badge>
+                        {editingCsvTransaction === index ? (
+                          <Select
+                            value={csvEditValues[index]?.type || result.data.transactionType}
+                            onValueChange={(value) => setCsvEditValues({
+                              ...csvEditValues,
+                              [index]: { ...csvEditValues[index], type: value }
+                            })}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="income">Income</SelectItem>
+                              <SelectItem value="expense">Expense</SelectItem>
+                              <SelectItem value="capex">Capex</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge 
+                            variant={
+                              result.data.transactionType === 'income' ? 'secondary' : 
+                              result.data.transactionType === 'capex' ? 'default' : 
+                              'destructive'
+                            }
+                            className={
+                              result.data.transactionType === 'income' ? 'text-green-600 bg-green-50' :
+                              result.data.transactionType === 'capex' ? 'text-blue-600 bg-blue-50' :
+                              'text-red-600 bg-red-50'
+                            }
+                          >
+                            {result.data.transactionType}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className={
                         result.data.transactionType === 'income' ? 'text-green-600' :
@@ -556,6 +933,37 @@ export default function Import() {
                           </div>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {editingCsvTransaction === index ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => saveCsvEdit(index)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={cancelCsvEdit}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startCsvEdit(index, result)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -564,6 +972,339 @@ export default function Import() {
           </Card>
         </>
       )}
+        </TabsContent>
+
+        <TabsContent value="boi" className="space-y-6">
+          {/* Header for BOI */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">BOI PDF Statement Import</h2>
+              <p className="text-muted-foreground text-sm">
+                Import transactions from Bank of Ireland PDF statements
+              </p>
+            </div>
+            
+            {boiImportStatus === 'completed' && selectedBoiCount > 0 && (
+              <Button onClick={handleImportSelectedBoi}>
+                <Plus className="w-4 h-4 mr-2" />
+                Import {selectedBoiCount} Transactions
+              </Button>
+            )}
+          </div>
+
+          {/* BOI Upload Section */}
+          {boiImportStatus === 'idle' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Upload BOI PDF Statement</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div
+                  ref={pdfDropZoneRef}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 cursor-pointer ${
+                    isBoiDragOver
+                      ? 'border-primary bg-primary/5 scale-105'
+                      : 'border-muted hover:border-primary/50'
+                  }`}
+                  onDragEnter={handleBoiDragEnter}
+                  onDragLeave={handleBoiDragLeave}
+                  onDragOver={handleBoiDragOver}
+                  onDrop={handleBoiDrop}
+                  onClick={handlePdfDropZoneClick}
+                >
+                  <Building2 className={`w-12 h-12 mx-auto mb-4 transition-colors duration-200 ${
+                    isBoiDragOver ? 'text-primary' : 'text-muted-foreground'
+                  }`} />
+                  <h3 className="text-lg font-medium mb-2">
+                    {isBoiDragOver ? 'Drop your BOI PDF statement here' : 'Drop your BOI PDF statement here'}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    or click to browse files
+                  </p>
+                  <input
+                    ref={pdfFileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={handlePdfFileInputChange}
+                    className="hidden"
+                    id="pdf-upload"
+                  />
+                  <label htmlFor="pdf-upload" onClick={(e) => e.stopPropagation()}>
+                    <Button asChild>
+                      <span>Choose PDF File</span>
+                    </Button>
+                  </label>
+                </div>
+                
+                <div className="mt-6">
+                  <h4 className="font-medium mb-2">BOI Statement Requirements:</h4>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>• <strong>File Format:</strong> PDF statement from Bank of Ireland</p>
+                    <p>• <strong>Content:</strong> Transaction details with dates, descriptions, and amounts</p>
+                    <p>• <strong>Processing:</strong> Automatically categorizes transactions based on description</p>
+                    <p>• <strong>Transaction Types:</strong> Payment-in = Income, Payment-out = Expense</p>
+                    <p>• <strong>Categories:</strong> Intelligent matching based on merchant names and history</p>
+                    <p>• <strong>Exclusions:</strong> Balance forward entries are automatically excluded</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* BOI Upload Progress */}
+          {(boiImportStatus === 'uploading' || boiImportStatus === 'processing') && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Building2 className="w-8 h-8 text-primary" />
+                    <div className="flex-1">
+                      <h3 className="font-medium">
+                        {boiImportStatus === 'uploading' ? 'Processing BOI statement...' : 'Analyzing transactions...'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {boiImportStatus === 'uploading' 
+                          ? 'Please wait while your PDF statement is being processed'
+                          : 'Extracting transaction data and suggesting categories'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Progress value={boiUploadProgress} className="w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* BOI Import Results */}
+          {boiImportStatus === 'completed' && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold text-green-600">{validBoiTransactions}</div>
+                    <p className="text-sm text-muted-foreground">Valid Transactions</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold text-red-600">
+                      {boiValidationResults.filter(t => t.status === 'category_mismatch').length}
+                    </div>
+                    <p className="text-sm text-muted-foreground">New Categories</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {boiValidationResults.filter(t => t.status === 'duplicate').length}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Duplicates</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-2xl font-bold text-blue-600">{selectedBoiCount}</div>
+                    <p className="text-sm text-muted-foreground">Selected for Import</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* BOI Issues Alert */}
+              {totalBoiTransactions > validBoiTransactions && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    {totalBoiTransactions - validBoiTransactions} transactions require attention before import.
+                    Please review and fix the issues below.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* BOI Import Preview Table */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>BOI Import Preview</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={toggleAllBoiTransactions}>
+                        {selectedBoiTransactions.size === boiValidationResults.length ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedBoiTransactions.size === boiValidationResults.length}
+                            onChange={toggleAllBoiTransactions}
+                            className="rounded"
+                          />
+                        </TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Issues</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {boiValidationResults.map((result, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedBoiTransactions.has(index)}
+                              onChange={() => toggleBoiTransactionSelection(index)}
+                              className="rounded"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(result.status)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {result.data.date}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {editingBoiTransaction === index ? (
+                              <Input
+                                value={boiEditValues[index]?.description || result.data.description}
+                                onChange={(e) => setBoiEditValues({
+                                  ...boiEditValues,
+                                  [index]: { ...boiEditValues[index], description: e.target.value }
+                                })}
+                                className="w-full"
+                              />
+                            ) : (
+                              result.data.description
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingBoiTransaction === index ? (
+                              <Select
+                                value={boiEditValues[index]?.category || result.data.category}
+                                onValueChange={(value) => setBoiEditValues({
+                                  ...boiEditValues,
+                                  [index]: { ...boiEditValues[index], category: value }
+                                })}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categories.map((category) => (
+                                    <SelectItem key={category} value={category}>
+                                      {category}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant="outline">{result.data.category}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingBoiTransaction === index ? (
+                              <Select
+                                value={boiEditValues[index]?.type || result.data.type}
+                                onValueChange={(value) => setBoiEditValues({
+                                  ...boiEditValues,
+                                  [index]: { ...boiEditValues[index], type: value }
+                                })}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="income">Income</SelectItem>
+                                  <SelectItem value="expense">Expense</SelectItem>
+                                  <SelectItem value="capex">Capex</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge 
+                                variant={
+                                  result.data.type === 'income' ? 'secondary' : 
+                                  result.data.type === 'capex' ? 'default' : 
+                                  'destructive'
+                                }
+                                className={
+                                  result.data.type === 'income' ? 'text-green-600 bg-green-50' :
+                                  result.data.type === 'capex' ? 'text-blue-600 bg-blue-50' :
+                                  'text-red-600 bg-red-50'
+                                }
+                              >
+                                {result.data.type}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className={
+                            result.data.type === 'income' ? 'text-green-600' :
+                            result.data.type === 'capex' ? 'text-blue-600' :
+                            'text-red-600'
+                          }>
+                            €{result.data.amount?.toFixed(2) || '0.00'}
+                          </TableCell>
+                          <TableCell>
+                            {result.issues.length > 0 && (
+                              <div className="text-sm text-muted-foreground space-y-1">
+                                {result.issues.map((issue, i) => (
+                                  <div key={i} className="flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                                    {issue}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingBoiTransaction === index ? (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => saveBoiEdit(index)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Check className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={cancelBoiEdit}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <X className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => startBoiEdit(index, result)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

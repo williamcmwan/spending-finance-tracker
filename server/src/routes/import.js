@@ -5,6 +5,7 @@ import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import { getRow, runQuery, getRows } from '../database/init.js';
+import { parseBoiStatement, suggestCategory } from '../utils/boiParser.js';
 
 const router = express.Router();
 
@@ -20,6 +21,21 @@ const upload = multer({
   },
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
+  }
+});
+
+// Configure multer for PDF uploads (BOI statements)
+const uploadPdf = multer({
+  dest: 'uploads/',
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf' || file.originalname.endsWith('.pdf')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit for PDFs
   }
 });
 
@@ -405,6 +421,215 @@ router.get('/template', (req, res) => {
     template,
     headers: Object.keys(template[0])
   });
+});
+
+// Upload and process BOI PDF statement
+router.post('/boi-upload', authenticateToken, uploadPdf.single('pdfFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+
+    // Parse BOI PDF statement
+    const pdfBuffer = fs.readFileSync(req.file.path);
+    const transactions = await parseBoiStatement(pdfBuffer);
+
+    // Get user's existing categories and transactions for intelligent matching
+    const existingCategories = await getRows(
+      'SELECT * FROM categories WHERE user_id = ? OR user_id IS NULL ORDER BY name',
+      [req.userId]
+    );
+
+    const userTransactions = await getRows(
+      'SELECT t.*, c.name as category_name FROM transactions t LEFT JOIN categories c ON t.category_id = c.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 500',
+      [req.userId]
+    );
+
+    // Process each transaction and suggest categories
+    const validationResults = [];
+    for (let i = 0; i < transactions.length; i++) {
+      const transaction = transactions[i];
+      
+      // Suggest category based on description and history
+      const suggestedCategory = suggestCategory(
+        transaction.description,
+        existingCategories,
+        userTransactions
+      );
+
+      // Check for exact duplicates
+      const existingTransaction = await getRow(
+        `SELECT * FROM transactions 
+         WHERE user_id = ? 
+         AND date = ? 
+         AND description = ? 
+         AND amount = ? 
+         AND type = ?`,
+        [
+          req.userId,
+          transaction.date,
+          transaction.description,
+          transaction.amount,
+          transaction.type
+        ]
+      );
+
+      let status = 'valid';
+      const issues = [];
+
+      if (existingTransaction) {
+        issues.push('Exact duplicate transaction found');
+        status = 'duplicate';
+      }
+
+      // Check if suggested category exists
+      const categoryExists = existingCategories.find(cat => 
+        cat.name.toLowerCase() === suggestedCategory.toLowerCase()
+      );
+
+      if (!categoryExists && suggestedCategory !== 'Other') {
+        issues.push(`Category '${suggestedCategory}' will be created automatically`);
+        status = status === 'valid' ? 'category_mismatch' : status;
+      }
+
+      validationResults.push({
+        rowIndex: i,
+        data: {
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.amount,
+          type: transaction.type,
+          category: suggestedCategory,
+          source: transaction.source,
+          balance: transaction.balance
+        },
+        status,
+        issues
+      });
+    }
+
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
+
+    // Return validation results
+    res.json({
+      success: true,
+      totalTransactions: transactions.length,
+      validationResults
+    });
+
+  } catch (error) {
+    console.error('BOI PDF import error:', error);
+    
+    // Clean up uploaded file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ error: 'Failed to process BOI PDF statement' });
+  }
+});
+
+// Import BOI transactions
+router.post('/boi-import', authenticateToken, [
+  body('transactions').isArray(),
+  body('transactions.*.date').isDate(),
+  body('transactions.*.description').notEmpty(),
+  body('transactions.*.amount').isNumeric(),
+  body('transactions.*.type').isIn(['income', 'expense', 'capex']),
+  body('transactions.*.category').notEmpty()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { transactions } = req.body;
+    const importedTransactions = [];
+    const importErrors = [];
+
+    for (const transaction of transactions) {
+      try {
+        // Get or create category (ensure category name is capitalized)
+        let categoryId;
+        const capitalizedCategoryName = capitalizeFirstLetter(transaction.category);
+        const existingCategory = await getRow(
+          'SELECT * FROM categories WHERE name = ? AND (user_id = ? OR user_id IS NULL)',
+          [capitalizedCategoryName, req.userId]
+        );
+
+        if (existingCategory) {
+          categoryId = existingCategory.id;
+        } else {
+          // Create new category with appropriate icon and color
+          let icon = 'tag';
+          let color = '#6B7280';
+          
+          // Set icon and color based on category name
+          const categoryName = capitalizedCategoryName.toLowerCase();
+          if (categoryName.includes('grocer') || categoryName.includes('food')) {
+            icon = 'shopping-cart';
+            color = '#10B981';
+          } else if (categoryName.includes('transport') || categoryName.includes('car')) {
+            icon = 'car';
+            color = '#3B82F6';
+          } else if (categoryName.includes('health') || categoryName.includes('medical')) {
+            icon = 'heart';
+            color = '#EF4444';
+          } else if (categoryName.includes('entertainment') || categoryName.includes('fun')) {
+            icon = 'film';
+            color = '#8B5CF6';
+          } else if (categoryName.includes('home') || categoryName.includes('garden')) {
+            icon = 'home';
+            color = '#F59E0B';
+          } else if (categoryName.includes('phone') || categoryName.includes('internet')) {
+            icon = 'smartphone';
+            color = '#06B6D4';
+          } else if (categoryName.includes('insurance')) {
+            icon = 'shield';
+            color = '#84CC16';
+          }
+
+          const newCategory = await runQuery(
+            'INSERT INTO categories (name, color, icon, user_id) VALUES (?, ?, ?, ?)',
+            [capitalizedCategoryName, color, icon, req.userId]
+          );
+          categoryId = newCategory.id;
+        }
+
+        // Insert transaction
+        const result = await runQuery(
+          `INSERT INTO transactions (description, amount, type, category_id, user_id, date, source) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [transaction.description, transaction.amount, transaction.type, categoryId, req.userId, transaction.date, transaction.source || 'BOI']
+        );
+
+        importedTransactions.push({
+          id: result.id,
+          ...transaction
+        });
+
+      } catch (error) {
+        importErrors.push({
+          transaction,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      importedCount: importedTransactions.length,
+      errorCount: importErrors.length,
+      importedTransactions,
+      errors: importErrors
+    });
+
+  } catch (error) {
+    console.error('BOI import error:', error);
+    res.status(500).json({ error: 'Failed to import BOI transactions' });
+  }
 });
 
 export { router as importRoutes };

@@ -40,7 +40,6 @@ import {
   Pill,
   Shield,
   FileText,
-  Building,
   Trees,
   Package,
   Repeat,
