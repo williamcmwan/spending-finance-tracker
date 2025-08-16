@@ -3,7 +3,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   Home,
   CreditCard,
-  PieChart,
   Upload,
   Settings,
   TrendingUp,
@@ -32,7 +31,6 @@ import { useToast } from "@/hooks/use-toast";
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Transactions", url: "/transactions", icon: CreditCard },
-  { title: "Analytics", url: "/analytics", icon: PieChart },
   { title: "Import", url: "/import", icon: Upload },
   { title: "Categories", url: "/categories", icon: Settings },
 ];
@@ -72,7 +70,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <div>
-                <h2 className="text-lg font-semibold">FinanceTracker</h2>
+                <h2 className="text-lg font-semibold">Finance Tracker</h2>
               </div>
             )}
           </div>

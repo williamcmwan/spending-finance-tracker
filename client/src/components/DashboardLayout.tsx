@@ -1,8 +1,5 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Bell, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -24,12 +21,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon">
-                  <Bell className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon">
-                  <User className="w-4 h-4" />
-                </Button>
+                {/* Top right icons removed as requested */}
               </div>
             </div>
           </header>
