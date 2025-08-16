@@ -103,7 +103,7 @@ setup_environment() {
         
         if [ -n "$LOCAL_IP" ]; then
             # Update CORS origins to include local network IP
-            CORS_ORIGINS="http://localhost:5173,http://localhost:4173,http://$LOCAL_IP:4173,http://$LOCAL_IP:5173"
+            CORS_ORIGINS="http://localhost:4173,http://$LOCAL_IP:4173"
             sed -i.bak "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=$CORS_ORIGINS|" server/.env
             print_status "Configured CORS for local network IP: $LOCAL_IP"
         fi

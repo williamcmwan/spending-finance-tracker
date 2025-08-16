@@ -136,14 +136,14 @@ start_development() {
     
     # Start client
     cd client
-    print_status "Starting client on port 5173..."
+    print_status "Starting client on port 4173..."
     npm run dev &
     CLIENT_PID=$!
     cd ..
     
     print_success "Development servers started!"
     print_status "Server: http://localhost:3001"
-    print_status "Client: http://localhost:5173"
+    print_status "Client: http://localhost:4173"
     print_status "Press Ctrl+C to stop all servers"
     
     # Wait for user to stop
