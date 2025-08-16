@@ -1140,83 +1140,78 @@ export default function Dashboard() {
               <div className="text-muted-foreground">No expense data found for this period</div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8"></TableHead>
-                    <TableHead className="min-w-32">Category</TableHead>
-                    {/* Dynamic month headers */}
-                    {monthlyCategorySpending.length > 0 && 
-                      Object.keys(monthlyCategorySpending[0].monthly_amounts).map(month => (
-                        <TableHead key={month} className="text-center min-w-24">{month}</TableHead>
-                      ))
-                    }
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {monthlyCategorySpending.map((category) => {
-                    const IconComponent = getCategoryIcon(category.category_icon);
-                    return (
-                      <TableRow key={category.category_name}>
-                        <TableCell className="py-3">
-                          <div className="flex items-center justify-center">
-                            {category.category_icon ? (
-                              <IconComponent 
-                                className="w-4 h-4" 
-                                style={{ color: getCategoryColor(category.category_color) }} 
-                              />
-                            ) : (
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: getCategoryColor(category.category_color) }}
-                              />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <div className="font-medium">{category.category_name}</div>
-                        </TableCell>
-                        {/* Dynamic month data */}
-                        {Object.entries(category.monthly_amounts).map(([month, data]) => (
-                          <TableCell key={month} className="py-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              {data.amount > 0 ? (
-                                <>
-                                  <span className="font-medium text-red-600">
-                                    ${data.amount.toFixed(0)}
-                                  </span>
-                                  {data.change_direction && data.change_percentage !== undefined && (
-                                    <div className="flex items-center gap-0.5 text-xs">
-                                      {data.change_direction === 'up' ? (
-                                        <ArrowUp className="w-3 h-3 text-green-600" />
-                                      ) : data.change_direction === 'down' ? (
-                                        <ArrowDown className="w-3 h-3 text-red-600" />
-                                      ) : null}
-                                      {data.change_percentage !== undefined && (
-                                        <span className={`${
-                                          data.change_direction === 'up' ? 'text-green-600' : 
-                                          data.change_direction === 'down' ? 'text-red-600' : 
-                                          'text-gray-500'
-                                        }`}>
-                                          {data.change_percentage.toFixed(0)}%
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-gray-400">-</span>
+            <Table className="table-fixed w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-32 px-2">Category</TableHead>
+                  {/* Dynamic month headers */}
+                  {monthlyCategorySpending.length > 0 && 
+                    Object.keys(monthlyCategorySpending[0].monthly_amounts).map(month => (
+                      <TableHead key={month} className="text-center px-1 w-16 text-xs">{month}</TableHead>
+                    ))
+                  }
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {monthlyCategorySpending.map((category) => {
+                  const IconComponent = getCategoryIcon(category.category_icon);
+                  return (
+                    <TableRow key={category.category_name}>
+                      <TableCell className="py-2 px-2">
+                        <div className="flex items-center gap-2">
+                          {category.category_icon ? (
+                            <IconComponent 
+                              className="w-3 h-3 flex-shrink-0" 
+                              style={{ color: getCategoryColor(category.category_color) }} 
+                            />
+                          ) : (
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: getCategoryColor(category.category_color) }}
+                            />
+                          )}
+                          <div className="font-medium text-sm truncate">{category.category_name}</div>
+                        </div>
+                      </TableCell>
+                      {/* Dynamic month data */}
+                      {Object.entries(category.monthly_amounts).map(([month, data]) => (
+                        <TableCell key={month} className="py-2 px-1 text-center">
+                          {data.amount > 0 ? (
+                            <div className="relative group">
+                              <span className="font-medium text-gray-900 dark:text-gray-100 cursor-pointer text-xs">
+                                ${data.amount >= 1000 ? (data.amount / 1000).toFixed(1) + 'k' : data.amount.toFixed(0)}
+                              </span>
+                              {data.change_direction && data.change_percentage !== undefined && (
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 px-2 py-1 bg-black text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                                  <div className="flex items-center gap-1">
+                                    {data.change_direction === 'up' ? (
+                                      <ArrowUp className="w-3 h-3 text-green-400" />
+                                    ) : data.change_direction === 'down' ? (
+                                      <ArrowDown className="w-3 h-3 text-red-400" />
+                                    ) : null}
+                                    <span className={`${
+                                      data.change_direction === 'up' ? 'text-green-400' : 
+                                      data.change_direction === 'down' ? 'text-red-400' : 
+                                      'text-gray-300'
+                                    }`}>
+                                      {data.change_percentage.toFixed(0)}% vs prev month
+                                    </span>
+                                  </div>
+                                  {/* Tooltip arrow */}
+                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-black"></div>
+                                </div>
                               )}
                             </div>
-                          </TableCell>
-                        ))}
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
+                        </TableCell>
+                      ))}
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>
