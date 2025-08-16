@@ -483,6 +483,11 @@ export default function Dashboard() {
         let totalExpenses = 0;
         
         transactions.forEach((transaction: Transaction) => {
+          // Explicitly exclude capex transactions
+          if (transaction.type === 'capex') {
+            return;
+          }
+          
           const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
           totalExpenses += amount;
@@ -540,6 +545,11 @@ export default function Dashboard() {
         const categoryTotals = new Map<string, { total: number; color: string }>();
         
         transactions.forEach((transaction: Transaction) => {
+          // Explicitly exclude capex transactions
+          if (transaction.type === 'capex') {
+            return;
+          }
+          
           const monthKey = format(new Date(transaction.date), 'MMM yyyy');
           const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
