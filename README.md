@@ -103,10 +103,12 @@ npm run dev
 
 ### Transaction Management
 - ✅ Create, read, update, delete transactions
+- ✅ **Three transaction types**: Income, Expense, Capital Expenditure (Capex)
 - ✅ **Inline editing** for transaction fields (description, date, source)
 - ✅ Categorize transactions with meaningful colors and icons
 - ✅ **Source field tracking** (bank names, import sources)
-- ✅ Filter and search transactions by multiple criteria
+- ✅ **Advanced filtering**: Min/Max amount, transaction type, date range
+- ✅ **CSV export** with source and transaction type fields
 - ✅ Date-based organization with flexible date ranges
 - ✅ Bulk import with CSV drag-and-drop support
 - ✅ **Lazy loading** for large transaction lists (performance optimized)
@@ -115,11 +117,16 @@ npm run dev
 - ✅ **Enhanced dashboard** with comprehensive financial overview
 - ✅ **Flexible date range picker** with calendar interface
 - ✅ **Quick date presets**: This Month, Last Month, Last 3/6/12 Months, This Year
+- ✅ **Default 6-month view** for immediate data visibility
 - ✅ **Category icons** displayed in transaction lists
-- ✅ **Real-time summary cards**: Income, Spending, Net Income, Savings Rate
+- ✅ **Real-time summary cards**: Income, Spending, Net Income, Savings Rate, Capital Expenditure
 - ✅ **Lazy-loaded transaction list** with scroll-based pagination
+- ✅ **Monthly category spending table** with pagination and trend indicators
+- ✅ **Chronological month sorting** with year display (Jan 2024, Feb 2024)
+- ✅ **8-month pagination** for category spending analysis
+- ✅ **Hover percentage indicators** for month-over-month changes
 - ✅ Category-wise spending breakdown
-- ✅ Monthly spending trends
+- ✅ Monthly spending trends with top category selection
 - ✅ Income vs expense tracking
 
 ### Categories
@@ -284,6 +291,33 @@ If you encounter any issues:
 4. Check the health endpoint: `http://localhost:3001/health`
 
 ## 🆕 Recent Updates
+
+### Version 2.1.0 - Advanced Analytics & UX Release
+
+#### 📊 **Monthly Category Spending Analysis**
+- **8-Month Pagination**: Navigate through spending data in 8-month chunks
+- **Chronological Sorting**: Months sorted by year and date (Jan 2024, Feb 2024)
+- **Trend Indicators**: Hover to see month-over-month percentage changes
+- **Scrollbar-Free Design**: Clean layout without horizontal/vertical scrollbars
+- **Readable Text**: Optimized font sizes for better readability
+
+#### 💰 **Capital Expenditure (Capex) Support**
+- **Three Transaction Types**: Income, Expense, and Capital Expenditure
+- **Capex Summary Card**: Dedicated tracking for capital investments
+- **Automatic Categorization**: Garden, Solar, Rental Property → Capex
+- **Filtered Analytics**: Charts exclude capex for operational spending analysis
+
+#### 🎯 **Enhanced User Experience**
+- **6-Month Default**: Dashboard opens with last 6 months of data
+- **Advanced Filtering**: Min/Max amount filters for transaction search
+- **Enhanced CSV Export**: Includes source and transaction type fields
+- **Improved Tooltips**: Clean percentage indicators without redundant text
+
+#### 🚀 **Performance & Technical Improvements**
+- **Database Migrations**: Automatic schema updates for new features
+- **Data Integrity**: Source field corruption detection and repair
+- **Memory Optimization**: Efficient handling of large transaction datasets
+- **Responsive Design**: Improved mobile and tablet experience
 
 ### Version 2.0.0 - Major Feature Release
 
