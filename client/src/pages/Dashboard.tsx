@@ -463,16 +463,13 @@ export default function Dashboard() {
       
       console.log('Fetching category spending for:', start, 'to', end);
       
-      // Fetch all expense and capex transactions for category analysis
+      // Fetch only expense transactions for category analysis (excluding capex)
       const expenseResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
-      const capexResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=capex&limit=999999`);
       
-      console.log('Category spending API Response:', expenseResponse, capexResponse);
+      console.log('Category spending API Response:', expenseResponse);
       
-      if (expenseResponse.transactions || capexResponse.transactions) {
-        const expenseTransactions = expenseResponse.transactions || [];
-        const capexTransactions = capexResponse.transactions || [];
-        const transactions = [...expenseTransactions, ...capexTransactions];
+      if (expenseResponse.transactions) {
+        const transactions = expenseResponse.transactions || [];
         
         // Group transactions by category and calculate totals
         const categoryMap = new Map<string, {
@@ -517,7 +514,7 @@ export default function Dashboard() {
         setCategorySpending(categorySpendingData);
         console.log('Category spending data:', categorySpendingData);
       } else {
-        console.error('Category spending API returned error:', expenseResponse.error || capexResponse.error);
+        console.error('Category spending API returned error:', expenseResponse.error);
         setCategorySpending([]);
       }
     } catch (error) {
@@ -532,14 +529,11 @@ export default function Dashboard() {
       
       console.log('Fetching monthly chart data for:', start, 'to', end);
       
-      // Fetch all expense and capex transactions for chart analysis
+      // Fetch only expense transactions for chart analysis (excluding capex)
       const expenseResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
-      const capexResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=capex&limit=999999`);
       
-      if (expenseResponse.transactions || capexResponse.transactions) {
-        const expenseTransactions = expenseResponse.transactions || [];
-        const capexTransactions = capexResponse.transactions || [];
-        const transactions = [...expenseTransactions, ...capexTransactions];
+      if (expenseResponse.transactions) {
+        const transactions = expenseResponse.transactions || [];
         
         // Group transactions by month and category
         const monthlyData = new Map<string, Map<string, { amount: number; color: string }>>();
@@ -607,7 +601,7 @@ export default function Dashboard() {
         console.log('Monthly chart data:', chartData);
         console.log('Chart categories:', topCategories);
       } else {
-        console.error('Monthly chart API returned error:', expenseResponse.error || capexResponse.error);
+        console.error('Monthly chart API returned error:', expenseResponse.error);
         setMonthlyChartData([]);
         setChartCategories([]);
       }
@@ -903,7 +897,7 @@ export default function Dashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>
-              Monthly Spending Trends - {getCategoryDisplayText(selectedCategoryCount)}
+              Monthly Spending Trends (Expenses Only) - {getCategoryDisplayText(selectedCategoryCount)}
             </CardTitle>
             <Select value={selectedCategoryCount} onValueChange={setSelectedCategoryCount}>
               <SelectTrigger className="w-32">
@@ -977,7 +971,7 @@ export default function Dashboard() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Spending by Category - {dateRange.from && dateRange.to ? (
+            Spending by Category (Expenses Only) - {dateRange.from && dateRange.to ? (
               `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
             ) : (
               'Select date range'
