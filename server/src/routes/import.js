@@ -65,8 +65,8 @@ const parseCSV = (filePath) => {
 const validateCSVStructure = (data) => {
   const requiredColumns = [
     'Date', 'Year', 'Month', 'Details / Description', 
-    'Income Amount', 'Spending Amount', 'Category', 
-    'Source / Bank', 'Currency', 'Spending for non-EUR currency'
+    'Income Amount', 'Spending Amount', 'Capex Amount', 'Category', 
+    'Source / Bank', 'Transaction Type', 'Currency', 'Spending for non-EUR currency'
   ];
 
   if (data.length === 0) {
@@ -97,19 +97,25 @@ const validateTransaction = async (row, index, userId) => {
   const issues = [];
   let status = 'valid';
 
-  // Validate date format (DD/MM/YYYY)
-  const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+  // Validate date format (DD/MM/YYYY or YYYY-MM-DD)
+  const ddmmyyyyRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+  const yyyymmddRegex = /^\d{4}-\d{2}-\d{2}$/;
   let parsedDate = row['Date'];
   
-  if (!dateRegex.test(row['Date'])) {
-    issues.push('Invalid date format. Expected DD/MM/YYYY');
-    status = 'invalid';
-  } else {
+  if (ddmmyyyyRegex.test(row['Date'])) {
     // Convert DD/MM/YYYY to YYYY-MM-DD for database storage
     const [day, month, year] = row['Date'].split('/');
     parsedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    
-    // Validate that it's a real date
+  } else if (yyyymmddRegex.test(row['Date'])) {
+    // Already in YYYY-MM-DD format, use as is
+    parsedDate = row['Date'];
+  } else {
+    issues.push('Invalid date format. Expected DD/MM/YYYY or YYYY-MM-DD');
+    status = 'invalid';
+  }
+  
+  // Validate that it's a real date (only if format was valid)
+  if (status !== 'invalid') {
     const dateObj = new Date(parsedDate);
     if (isNaN(dateObj.getTime()) || dateObj.toISOString().split('T')[0] !== parsedDate) {
       issues.push('Invalid date value');
@@ -120,9 +126,17 @@ const validateTransaction = async (row, index, userId) => {
   // Validate amounts
   const incomeAmount = parseFloat(row['Income Amount']) || 0;
   const spendingAmount = parseFloat(row['Spending Amount']) || 0;
+  const capexAmount = parseFloat(row['Capex Amount']) || 0;
 
-  if (isNaN(incomeAmount) || isNaN(spendingAmount)) {
+  if (isNaN(incomeAmount) || isNaN(spendingAmount) || isNaN(capexAmount)) {
     issues.push('Invalid amount format');
+    status = 'invalid';
+  }
+
+  // Validate transaction type
+  const transactionType = row['Transaction Type'] ? row['Transaction Type'].toLowerCase() : '';
+  if (transactionType && !['income', 'expense', 'capex'].includes(transactionType)) {
+    issues.push('Invalid transaction type. Must be income, expense, or capex');
     status = 'invalid';
   }
 
@@ -141,6 +155,32 @@ const validateTransaction = async (row, index, userId) => {
     }
   }
 
+  // Determine transaction type and amount
+  let type, amount;
+  if (transactionType) {
+    // Use explicit transaction type from CSV
+    type = transactionType;
+    if (type === 'income') {
+      amount = Math.abs(incomeAmount);
+    } else if (type === 'expense') {
+      amount = Math.abs(spendingAmount);
+    } else if (type === 'capex') {
+      amount = Math.abs(capexAmount);
+    }
+  } else {
+    // Fallback to old logic if no transaction type specified
+    if (incomeAmount > 0) {
+      type = 'income';
+      amount = Math.abs(incomeAmount);
+    } else if (capexAmount > 0) {
+      type = 'capex';
+      amount = Math.abs(capexAmount);
+    } else {
+      type = 'expense';
+      amount = Math.abs(spendingAmount);
+    }
+  }
+
   // Check for exact duplicates (only if date is valid)
   let existingTransaction = null;
   if (status !== 'invalid') {
@@ -155,8 +195,8 @@ const validateTransaction = async (row, index, userId) => {
         userId,
         parsedDate,
         row['Details / Description'],
-        Math.abs(incomeAmount > 0 ? incomeAmount : spendingAmount),
-        incomeAmount > 0 ? 'income' : 'expense'
+        amount,
+        type
       ]
     );
   }
@@ -173,12 +213,15 @@ const validateTransaction = async (row, index, userId) => {
       description: row['Details / Description'],
       incomeAmount: incomeAmount,
       spendingAmount: spendingAmount,
+      capexAmount: capexAmount,
       category: categoryName || row['Category'], // Use capitalized category name if available
       source: row['Source / Bank'],
+      transactionType: type,
       currency: row['Currency'],
       nonEurSpending: row['Spending for non-EUR currency'],
       year: row['Year'],
-      month: row['Month']
+      month: row['Month'],
+      amount: amount
     },
     status,
     issues
@@ -272,9 +315,9 @@ router.post('/import', authenticateToken, [
           categoryId = newCategory.id;
         }
 
-        // Determine transaction type and amount
-        const type = transaction.incomeAmount > 0 ? 'income' : 'expense';
-        const amount = Math.abs(transaction.incomeAmount > 0 ? transaction.incomeAmount : transaction.spendingAmount);
+        // Use the transaction type and amount determined during validation
+        const type = transaction.transactionType;
+        const amount = transaction.amount;
 
         // Insert transaction
         const result = await runQuery(
@@ -318,12 +361,14 @@ router.get('/template', (req, res) => {
       'Year': '2025',
       'Month': '01',
       'Details / Description': 'Grocery shopping',
-      'Income Amount': '0',
+      'Income Amount': '0.00',
       'Spending Amount': '45.50',
+      'Capex Amount': '0.00',
       'Category': 'Food & dining',
       'Source / Bank': 'Chase Bank',
-      'Currency': 'USD',
-      'Spending for non-EUR currency': '0'
+      'Transaction Type': 'expense',
+      'Currency': 'EUR',
+      'Spending for non-EUR currency': ''
     },
     {
       'Date': '15/01/2025',
@@ -331,11 +376,27 @@ router.get('/template', (req, res) => {
       'Month': '01',
       'Details / Description': 'Salary deposit',
       'Income Amount': '5000.00',
-      'Spending Amount': '0',
+      'Spending Amount': '0.00',
+      'Capex Amount': '0.00',
       'Category': 'Salary',
-      'Source / Bank': 'Chase Bank',
-      'Currency': 'USD',
-      'Spending for non-EUR currency': '0'
+      'Source / Bank': 'Company Bank',
+      'Transaction Type': 'income',
+      'Currency': 'EUR',
+      'Spending for non-EUR currency': ''
+    },
+    {
+      'Date': '2025-01-20',
+      'Year': '2025',
+      'Month': '01',
+      'Details / Description': 'Solar panel installation',
+      'Income Amount': '0.00',
+      'Spending Amount': '0.00',
+      'Capex Amount': '2500.00',
+      'Category': 'Solar',
+      'Source / Bank': 'Home Improvement Bank',
+      'Transaction Type': 'capex',
+      'Currency': 'EUR',
+      'Spending for non-EUR currency': ''
     }
   ];
 

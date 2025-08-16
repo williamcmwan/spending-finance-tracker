@@ -32,12 +32,15 @@ interface ValidationResult {
     description: string;
     incomeAmount: number;
     spendingAmount: number;
+    capexAmount: number;
     category: string;
     source: string;
+    transactionType: string;
     currency: string;
     nonEurSpending: string;
     year: string;
     month: string;
+    amount: number;
   };
   status: 'valid' | 'invalid' | 'category_mismatch' | 'duplicate';
   issues: string[];
@@ -370,14 +373,16 @@ export default function Import() {
             <div className="mt-6">
               <h4 className="font-medium mb-2">CSV Format Requirements:</h4>
               <div className="text-sm text-muted-foreground space-y-1">
-                <p>• <strong>Date:</strong> DD/MM/YYYY format (required)</p>
-                <p>• <strong>Year:</strong> Year value (ignored in import)</p>
-                <p>• <strong>Month:</strong> Month value (ignored in import)</p>
+                <p>• <strong>Date:</strong> DD/MM/YYYY or YYYY-MM-DD format (required)</p>
+                <p>• <strong>Year:</strong> Year value (auto-generated from date)</p>
+                <p>• <strong>Month:</strong> Month value (auto-generated from date)</p>
                 <p>• <strong>Details / Description:</strong> Transaction description (required)</p>
-                <p>• <strong>Income Amount:</strong> Income amount, +ve = income, -ve = reduction (required)</p>
-                <p>• <strong>Spending Amount:</strong> Spending amount, +ve = spending, -ve = refund (required)</p>
+                <p>• <strong>Income Amount:</strong> Amount for income transactions (0.00 if not income)</p>
+                <p>• <strong>Spending Amount:</strong> Amount for expense transactions (0.00 if not expense)</p>
+                <p>• <strong>Capex Amount:</strong> Amount for capital expenditure transactions (0.00 if not capex)</p>
                 <p>• <strong>Category:</strong> Transaction category (required)</p>
                 <p>• <strong>Source / Bank:</strong> Bank or account name (required)</p>
+                <p>• <strong>Transaction Type:</strong> income, expense, or capex (required)</p>
                 <p>• <strong>Currency:</strong> Transaction currency (required)</p>
                 <p>• <strong>Spending for non-EUR currency:</strong> Non-EUR spending amount (optional)</p>
               </div>
@@ -484,8 +489,8 @@ export default function Import() {
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Income</TableHead>
-                    <TableHead>Spending</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Issues</TableHead>
                   </TableRow>
@@ -513,11 +518,28 @@ export default function Import() {
                       <TableCell>
                         <Badge variant="outline">{result.data.category}</Badge>
                       </TableCell>
-                      <TableCell className="text-green-600">
-                        {result.data.incomeAmount > 0 ? `$${result.data.incomeAmount.toFixed(2)}` : '-'}
+                      <TableCell>
+                        <Badge 
+                          variant={
+                            result.data.transactionType === 'income' ? 'secondary' : 
+                            result.data.transactionType === 'capex' ? 'default' : 
+                            'destructive'
+                          }
+                          className={
+                            result.data.transactionType === 'income' ? 'text-green-600 bg-green-50' :
+                            result.data.transactionType === 'capex' ? 'text-blue-600 bg-blue-50' :
+                            'text-red-600 bg-red-50'
+                          }
+                        >
+                          {result.data.transactionType}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-red-600">
-                        {result.data.spendingAmount > 0 ? `$${result.data.spendingAmount.toFixed(2)}` : '-'}
+                      <TableCell className={
+                        result.data.transactionType === 'income' ? 'text-green-600' :
+                        result.data.transactionType === 'capex' ? 'text-blue-600' :
+                        'text-red-600'
+                      }>
+                        ${result.data.amount?.toFixed(2) || '0.00'}
                       </TableCell>
                       <TableCell>
                         {result.data.source}
