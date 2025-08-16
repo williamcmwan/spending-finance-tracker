@@ -1162,7 +1162,7 @@ export default function Dashboard() {
                       dataKey={category.name}
                       stackId="spending"
                       fill={category.color}
-                      name={category.name}
+                      name={`${category.name} ($${category.total.toFixed(0)})`}
                     />
                   ))}
                 </BarChart>
