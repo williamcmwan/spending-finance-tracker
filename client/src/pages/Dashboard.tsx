@@ -1142,20 +1142,34 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="month" 
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 14, fontFamily: 'inherit' }}
                     angle={-45}
                     textAnchor="end"
                     height={60}
                   />
                   <YAxis 
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 14, fontFamily: 'inherit' }}
                     tickFormatter={(value) => `$${value.toLocaleString()}`}
                   />
                   <Tooltip 
                     formatter={(value: number, name: string) => [`$${value.toFixed(2)}`, name]}
                     labelFormatter={(label) => `Month: ${label}`}
+                    contentStyle={{ 
+                      fontSize: '14px', 
+                      fontFamily: 'inherit',
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
                   />
-                  <Legend />
+                  <Legend 
+                    wrapperStyle={{ 
+                      fontSize: '14px', 
+                      fontFamily: 'inherit',
+                      paddingTop: '10px'
+                    }}
+                  />
                   {chartCategories.map((category, index) => (
                     <Bar
                       key={category.name}
