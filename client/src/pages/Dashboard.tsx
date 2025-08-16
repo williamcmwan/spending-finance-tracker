@@ -9,7 +9,9 @@ import {
   TrendingUp, 
   TrendingDown, 
   DollarSign,
-  Building, 
+  Building,
+  ArrowUp,
+  ArrowDown, 
   PieChart,
   Calendar as CalendarIcon,
   Tag,
@@ -146,6 +148,19 @@ interface CategorySpending {
   transaction_count: number;
 }
 
+interface MonthlyCategorySpending {
+  category_name: string;
+  category_color: string;
+  category_icon?: string;
+  monthly_amounts: {
+    [monthKey: string]: {
+      amount: number;
+      change_percentage?: number;
+      change_direction?: 'up' | 'down' | 'same';
+    };
+  };
+}
+
 interface MonthlySpendingData {
   month: string;
   [categoryName: string]: number | string;
@@ -189,6 +204,7 @@ export default function Dashboard() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [totalTransactionCount, setTotalTransactionCount] = useState(0);
   const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
+  const [monthlyCategorySpending, setMonthlyCategorySpending] = useState<MonthlyCategorySpending[]>([]);
   const [monthlyChartData, setMonthlyChartData] = useState<MonthlySpendingData[]>([]);
   const [chartCategories, setChartCategories] = useState<ChartCategoryData[]>([]);
   const [selectedCategoryCount, setSelectedCategoryCount] = useState<string>("5");
@@ -528,6 +544,130 @@ export default function Dashboard() {
     }
   };
 
+  const fetchMonthlyCategorySpending = async (range: { from: Date; to: Date }) => {
+    try {
+      const { start, end } = getDateRange(range);
+      
+      console.log('Fetching monthly category spending for:', start, 'to', end);
+      
+      // Fetch only expense transactions for monthly category analysis
+      const expenseResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
+      
+      if (expenseResponse.transactions) {
+        const transactions = expenseResponse.transactions || [];
+        
+        // Group transactions by category and month
+        const categoryMonthlyData = new Map<string, {
+          category_name: string;
+          category_color: string;
+          category_icon?: string;
+          monthly_amounts: Map<string, number>;
+        }>();
+        
+        transactions.forEach((transaction: Transaction) => {
+          // Explicitly exclude capex transactions
+          if (transaction.type === 'capex') {
+            return;
+          }
+          
+          const monthKey = format(new Date(transaction.date), 'MMM');
+          const categoryName = transaction.category_name || 'Uncategorized';
+          const amount = transaction.amount;
+          
+          if (!categoryMonthlyData.has(categoryName)) {
+            categoryMonthlyData.set(categoryName, {
+              category_name: categoryName,
+              category_color: transaction.category_color,
+              category_icon: transaction.category_icon,
+              monthly_amounts: new Map()
+            });
+          }
+          
+          const categoryData = categoryMonthlyData.get(categoryName)!;
+          const currentAmount = categoryData.monthly_amounts.get(monthKey) || 0;
+          categoryData.monthly_amounts.set(monthKey, currentAmount + amount);
+        });
+        
+        // Convert to final format with percentage calculations
+        const monthlyCategoryData: MonthlyCategorySpending[] = [];
+        
+        // Get all unique months in chronological order
+        const allMonths = new Set<string>();
+        categoryMonthlyData.forEach(categoryData => {
+          categoryData.monthly_amounts.forEach((_, monthKey) => {
+            allMonths.add(monthKey);
+          });
+        });
+        
+        const sortedMonths = Array.from(allMonths).sort((a, b) => {
+          const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return monthOrder.indexOf(a) - monthOrder.indexOf(b);
+        });
+        
+        categoryMonthlyData.forEach(categoryData => {
+          const monthly_amounts: { [monthKey: string]: { amount: number; change_percentage?: number; change_direction?: 'up' | 'down' | 'same' } } = {};
+          
+          let previousAmount = 0;
+          sortedMonths.forEach(monthKey => {
+            const amount = categoryData.monthly_amounts.get(monthKey) || 0;
+            let change_percentage: number | undefined;
+            let change_direction: 'up' | 'down' | 'same' | undefined;
+            
+            if (previousAmount > 0) {
+              const changePercent = ((amount - previousAmount) / previousAmount) * 100;
+              change_percentage = Math.abs(changePercent);
+              
+              if (changePercent > 0) {
+                change_direction = 'up';
+              } else if (changePercent < 0) {
+                change_direction = 'down';
+              } else {
+                change_direction = 'same';
+              }
+            }
+            
+            monthly_amounts[monthKey] = {
+              amount,
+              change_percentage,
+              change_direction
+            };
+            
+            if (amount > 0) {
+              previousAmount = amount;
+            }
+          });
+          
+          // Only include categories that have spending in at least one month
+          const hasSpending = Object.values(monthly_amounts).some(month => month.amount > 0);
+          if (hasSpending) {
+            monthlyCategoryData.push({
+              category_name: categoryData.category_name,
+              category_color: categoryData.category_color,
+              category_icon: categoryData.category_icon,
+              monthly_amounts
+            });
+          }
+        });
+        
+        // Sort by total spending across all months
+        monthlyCategoryData.sort((a, b) => {
+          const totalA = Object.values(a.monthly_amounts).reduce((sum, month) => sum + month.amount, 0);
+          const totalB = Object.values(b.monthly_amounts).reduce((sum, month) => sum + month.amount, 0);
+          return totalB - totalA;
+        });
+        
+        setMonthlyCategorySpending(monthlyCategoryData);
+        console.log('Monthly category spending data:', monthlyCategoryData);
+      } else {
+        console.error('Monthly category spending API returned error:', expenseResponse.error);
+        setMonthlyCategorySpending([]);
+      }
+    } catch (error) {
+      console.error('Error fetching monthly category spending:', error);
+      setMonthlyCategorySpending([]);
+    }
+  };
+
   const fetchMonthlyChartData = async (range: { from: Date; to: Date }, categoryCount: string = "5") => {
     try {
       const { start, end } = getDateRange(range);
@@ -629,12 +769,14 @@ export default function Dashboard() {
     setHasMoreTransactions(true);
     setTotalTransactionCount(0);
     setCategorySpending([]);
+    setMonthlyCategorySpending([]);
     setMonthlyChartData([]);
     setChartCategories([]);
     
-    // Fetch summary data, category spending, chart data, and initial transactions
+    // Fetch summary data, category spending, monthly category spending, chart data, and initial transactions
     fetchSummaryData(dateRange);
     fetchCategorySpending(dateRange);
+    fetchMonthlyCategorySpending(dateRange);
     fetchMonthlyChartData(dateRange, selectedCategoryCount);
     fetchTransactions(dateRange, 1, true);
   }, [dateRange]);
@@ -993,75 +1135,88 @@ export default function Dashboard() {
             <div className="flex items-center justify-center py-8">
               <div className="text-muted-foreground">Loading category data...</div>
             </div>
-          ) : categorySpending.length === 0 ? (
+          ) : monthlyCategorySpending.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-muted-foreground">No expense data found for this period</div>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="w-24 text-center">Transactions</TableHead>
-                  <TableHead className="w-32 text-right">Amount</TableHead>
-                  <TableHead className="w-20 text-right">Percentage</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {categorySpending.map((category, index) => {
-                  const IconComponent = getCategoryIcon(category.category_icon);
-                  return (
-                    <TableRow key={category.category_name}>
-                      <TableCell className="py-3">
-                        <div className="flex items-center justify-center">
-                          {category.category_icon ? (
-                            <IconComponent 
-                              className="w-4 h-4" 
-                              style={{ color: getCategoryColor(category.category_color) }} 
-                            />
-                          ) : (
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: getCategoryColor(category.category_color) }}
-                            />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="font-medium">{category.category_name}</div>
-                      </TableCell>
-                      <TableCell className="py-3 text-center">
-                        <div className="text-sm text-muted-foreground">
-                          {category.transaction_count}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-right">
-                        <div className="font-medium text-red-600">
-                          ${category.total_amount.toFixed(2)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="text-sm font-medium">
-                            {category.percentage.toFixed(1)}%
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead className="min-w-32">Category</TableHead>
+                    {/* Dynamic month headers */}
+                    {monthlyCategorySpending.length > 0 && 
+                      Object.keys(monthlyCategorySpending[0].monthly_amounts).map(month => (
+                        <TableHead key={month} className="text-center min-w-24">{month}</TableHead>
+                      ))
+                    }
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyCategorySpending.map((category) => {
+                    const IconComponent = getCategoryIcon(category.category_icon);
+                    return (
+                      <TableRow key={category.category_name}>
+                        <TableCell className="py-3">
+                          <div className="flex items-center justify-center">
+                            {category.category_icon ? (
+                              <IconComponent 
+                                className="w-4 h-4" 
+                                style={{ color: getCategoryColor(category.category_color) }} 
+                              />
+                            ) : (
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: getCategoryColor(category.category_color) }}
+                              />
+                            )}
                           </div>
-                          <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full"
-                              style={{ 
-                                width: `${Math.min(category.percentage, 100)}%`,
-                                backgroundColor: getCategoryColor(category.category_color)
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="font-medium">{category.category_name}</div>
+                        </TableCell>
+                        {/* Dynamic month data */}
+                        {Object.entries(category.monthly_amounts).map(([month, data]) => (
+                          <TableCell key={month} className="py-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {data.amount > 0 ? (
+                                <>
+                                  <span className="font-medium text-red-600">
+                                    ${data.amount.toFixed(0)}
+                                  </span>
+                                  {data.change_direction && data.change_percentage !== undefined && (
+                                    <div className="flex items-center gap-0.5 text-xs">
+                                      {data.change_direction === 'up' ? (
+                                        <ArrowUp className="w-3 h-3 text-green-600" />
+                                      ) : data.change_direction === 'down' ? (
+                                        <ArrowDown className="w-3 h-3 text-red-600" />
+                                      ) : null}
+                                      {data.change_percentage !== undefined && (
+                                        <span className={`${
+                                          data.change_direction === 'up' ? 'text-green-600' : 
+                                          data.change_direction === 'down' ? 'text-red-600' : 
+                                          'text-gray-500'
+                                        }`}>
+                                          {data.change_percentage.toFixed(0)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
