@@ -1,17 +1,11 @@
-// Dynamic API URL based on current protocol and host
+// Simple API URL configuration
 const getApiBaseUrl = () => {
-  // If we have a specific API URL configured, use it (for development)
-  if (import.meta.env.VITE_API_URL && !window.location.href.includes('finance.shopassist.dpdns.org')) {
-    return import.meta.env.VITE_API_URL;
-  }
-  
-  // For production through Cloudflare - use relative URL
-  if (window.location.href.includes('finance.shopassist.dpdns.org')) {
-    // Use relative URL - Cloudflare will handle the proxying
+  // In production, client and server are served from same origin - use relative URLs
+  if (import.meta.env.PROD) {
     return '/api';
   }
   
-  // Default fallback
+  // In development, use configured API URL or default
   return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 };
 

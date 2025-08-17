@@ -445,9 +445,16 @@ main() {
                     start_client
                     ;;
                 "all"|"")
-                    start_server
-                    if [ $? -eq 0 ]; then
-                        start_client
+                    local environment=$(detect_environment)
+                    if [ "$environment" = "production" ]; then
+                        print_status "Production mode: Starting server only (serves both client and API)"
+                        start_server
+                    else
+                        print_status "Development mode: Starting both server and client separately"
+                        start_server
+                        if [ $? -eq 0 ]; then
+                            start_client
+                        fi
                     fi
                     ;;
                 *)
@@ -465,8 +472,15 @@ main() {
                     stop_client
                     ;;
                 "all"|"")
-                    stop_client
-                    stop_server
+                    local environment=$(detect_environment)
+                    if [ "$environment" = "production" ]; then
+                        print_status "Production mode: Stopping server (which serves both client and API)"
+                        stop_server
+                    else
+                        print_status "Development mode: Stopping both server and client"
+                        stop_client
+                        stop_server
+                    fi
                     ;;
                 *)
                     print_error "Invalid component: $component. Use 'server', 'client', or 'all'"

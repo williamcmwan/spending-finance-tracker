@@ -193,12 +193,11 @@ build_application() {
     fi
     
     # Create production environment file
-    print_status "Configuring client API URL..."
-    # For production, use relative URL to work with HTTPS through Cloudflare
+    print_status "Configuring client for single-server deployment..."
     echo "# Auto-generated client environment for production" > .env
-    echo "# Use relative URL for Cloudflare proxy compatibility" >> .env
+    echo "# Production build - API served from same server" >> .env
     echo "VITE_API_URL=/api" >> .env
-    print_status "Client API URL set to: /api (relative URL for Cloudflare proxy)"
+    print_status "Client configured for single-server deployment (client + API on same port)"
     
     # Clean any problematic temp files
     rm -rf node_modules/.vite-temp .vite 2>/dev/null || true

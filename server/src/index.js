@@ -140,10 +140,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+// Serve static files from client build (for production)
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '../../client/dist');
+  console.log(`📁 Serving static files from: ${clientBuildPath}`);
+  
+  // Serve static assets
+  app.use(express.static(clientBuildPath));
+  
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API route not found' });
+    }
+    
+    // Serve index.html for all other routes (SPA routing)
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+} else {
+  // 404 handler for development (when client runs separately)
+  app.use('*', (req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+  });
+}
 
 // Start server
 const HOST = process.env.HOST || '0.0.0.0';
