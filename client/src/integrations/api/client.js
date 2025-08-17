@@ -5,10 +5,10 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // For production through Cloudflare - use API subdomain
+  // For production through Cloudflare - use relative URL
   if (window.location.href.includes('finance.shopassist.dpdns.org')) {
-    // Use API subdomain for clean separation and HTTPS support
-    return 'https://api.finance.shopassist.dpdns.org/api';
+    // Use relative URL - Cloudflare will handle the proxying
+    return '/api';
   }
   
   // Default fallback
