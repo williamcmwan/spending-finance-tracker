@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
     allowedHosts: "all",
     strictPort: false,
     cors: true,
+    disableHostCheck: true,
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -30,6 +31,24 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === 'development' &&
     componentTagger(),
+    // Custom plugin to completely disable host checking
+    {
+      name: 'disable-host-check',
+      configureServer(server) {
+        server.middlewares.use('/', (req, res, next) => {
+          // Override host header validation
+          req.headers.host = 'localhost:4173';
+          next();
+        });
+      },
+      configurePreviewServer(server) {
+        server.middlewares.use('/', (req, res, next) => {
+          // Override host header validation for preview
+          req.headers.host = 'localhost:4173';
+          next();
+        });
+      }
+    }
   ].filter(Boolean),
   resolve: {
     alias: {
