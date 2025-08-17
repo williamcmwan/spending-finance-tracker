@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
+    "serve": "npx serve dist -s -l 4173 --cors",
     "type-check": "tsc --noEmit",
     "test": "echo \"No tests specified\" && exit 0"
   },

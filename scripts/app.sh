@@ -142,8 +142,8 @@ start_client() {
         return 1
     fi
     
-    # Start client in background and capture PID
-    nohup npm run preview > "$CLIENT_LOG" 2>&1 &
+    # Start client in background and capture PID (using serve instead of vite preview)
+    nohup npm run serve > "$CLIENT_LOG" 2>&1 &
     local client_pid=$!
     
     # Save PID to file
