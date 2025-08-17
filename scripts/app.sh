@@ -195,8 +195,26 @@ stop_server() {
             local cmd=$(ps -p $pid -o command= 2>/dev/null || echo "")
             print_status "Checking process $pid: $cmd"
             
-            # Check if it's our project or a Node.js process on port 3001
-            if echo "$cmd" | grep -q "$project_path" || echo "$cmd" | grep -q "node.*3001" || echo "$cmd" | grep -q "npm.*start"; then
+            # Check if it's likely our server process
+            # More comprehensive detection for our server process
+            local is_our_process=false
+            
+            # Direct project path match
+            if echo "$cmd" | grep -q "$project_path"; then
+                is_our_process=true
+            # Node.js running our server files
+            elif echo "$cmd" | grep -E -q "(node.*src/index\.js|node.*server|npm.*start)"; then
+                is_our_process=true
+            # Process name contains our project
+            elif echo "$cmd" | grep -q "spending-finance-tracker"; then
+                is_our_process=true
+            # If we're in the project directory and it's a node process on our port, likely ours
+            elif echo "$cmd" | grep -q "^node " && pwd | grep -q "spending-finance-tracker"; then
+                is_our_process=true
+            fi
+            
+            if [ "$is_our_process" = true ]; then
+                print_status "✓ Process $pid identified as our server process"
                 print_status "Attempting to kill process on port 3001 (PID: $pid)"
                 
                 # Try multiple kill methods
@@ -215,7 +233,9 @@ stop_server() {
                     print_status "Try: sudo kill -9 $pid"
                 fi
             else
-                print_status "Process $pid doesn't belong to our project, skipping"
+                print_status "✗ Process $pid doesn't match our detection patterns, skipping"
+                print_status "  Command: $cmd"
+                print_status "  Project path: $project_path"
             fi
         done
     fi
