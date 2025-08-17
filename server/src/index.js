@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import session from 'express-session';
@@ -142,7 +143,6 @@ app.use((err, req, res, next) => {
 
 // Serve static files from client build (for production)
 const clientBuildPath = path.join(__dirname, '../../client/dist');
-const fs = require('fs');
 
 // Check if client build exists
 const hasClientBuild = fs.existsSync(clientBuildPath) && fs.existsSync(path.join(clientBuildPath, 'index.html'));
