@@ -8,17 +8,15 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: [
-      "finance.shopassist.dpdns.org",
-      "localhost",
-      "127.0.0.1",
-      ".dpdns.org"
-    ]
+    allowedHosts: "all"
   },
   preview: {
     host: "::",
-    port: 8080,
-    allowedHosts: "all"
+    port: 4173,
+    allowedHosts: "all",
+    proxy: {
+      // Handle reverse proxy headers from Cloudflare
+    }
   },
   plugins: [
     react(),
