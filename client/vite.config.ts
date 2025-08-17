@@ -8,15 +8,17 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    allowedHosts: [
+      "finance.shopassist.dpdns.org",
+      "localhost",
+      "127.0.0.1",
+      ".dpdns.org"
+    ]
   },
   preview: {
     host: "::",
     port: 8080,
-    allowedHosts: [
-      "finance.shopassist.dpdns.org",
-      "localhost",
-      "127.0.0.1"
-    ]
+    allowedHosts: "all"
   },
   plugins: [
     react(),
