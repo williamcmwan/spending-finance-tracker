@@ -1,422 +1,420 @@
-# 🚀 Deployment Guide
+# 🚀 Deployment Guide - Single-Server Architecture
 
 ## 📋 Overview
 
-This guide covers deployment of the Spending Finance Tracker using the unified deployment system. The application supports both development and production environments, automatically detected from your `.env` configuration.
+The Spending Finance Tracker uses a **single-server deployment** architecture where both the frontend and backend are served from one Express.js server on port 3001. This eliminates CORS issues, simplifies proxy configuration, and provides better performance.
 
 ## 🎯 Quick Start
 
 ### 1. **Basic Deployment**
 ```bash
-# Auto-detect environment and deploy locally
+# Build client and configure server
 ./scripts/deploy.sh
 
-# Start the application
+# Start single server (serves frontend + API)
 ./scripts/app.sh start
 
 # Check status
 ./scripts/app.sh status
 ```
 
-### 2. **Environment-Specific Deployment**
+### 2. **Production Deployment**
 ```bash
-# Force production environment
+# Build for production environment
 ./scripts/deploy.sh -e production
 
-# Force development environment  
-./scripts/deploy.sh -e development
+# Start application
+./scripts/app.sh start
 
-# Deploy to Vercel
-./scripts/deploy.sh -p vercel
+# Access at http://your-server:3001
 ```
+
+## 🏗️ Single-Server Architecture
+
+### How It Works
+1. **Client Build**: React app builds to `client/dist/`
+2. **Server Configuration**: Express serves static files + API routes
+3. **Unified Port**: Everything accessible via port 3001
+4. **Relative URLs**: Client uses `/api/*` for all requests
+
+### Benefits
+- ✅ **No CORS Issues**: Same origin for all requests
+- ✅ **No Mixed Content**: Consistent protocol (HTTP/HTTPS)
+- ✅ **Simplified Proxy**: Only one port to forward
+- ✅ **Better Performance**: No cross-origin latency
+- ✅ **Easier SSL**: Single certificate needed
+- ✅ **Cloudflare Ready**: Works with proxy services
 
 ## 🔧 Environment Configuration
 
-### **Environment Detection**
-The deployment script automatically detects your environment from `server/.env`:
-
-```bash
-# Production
+### Server Environment (`server/.env`)
+```env
+# Core Configuration
 NODE_ENV=production
-
-# Development
-NODE_ENV=development
-
-# Test
-NODE_ENV=test
-```
-
-### **Environment Files**
-
-#### **Server Configuration (`server/.env`)**
-```bash
-# Environment
-NODE_ENV=production
-
-# Server
 PORT=3001
+HOST=0.0.0.0
 
-# Security
-JWT_SECRET=your_production_jwt_secret
-SESSION_SECRET=your_production_session_secret
+# Authentication
+JWT_SECRET=your_secure_jwt_secret_here
+SESSION_SECRET=your_secure_session_secret_here
+
+# Google OAuth (Optional)
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
 
 # Database
 DATABASE_PATH=./data/spending.db
 
-# CORS (auto-configured for production)
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:4173,http://192.168.1.100:4173
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3001,https://yourdomain.com
 ```
 
-#### **Client Configuration (`client/.env`)**
+### Client Configuration
+**No environment variables needed!** The client automatically uses relative URLs for all API calls.
+
+## 🚀 Deployment Options
+
+### Option 1: Direct Server Deployment
+
+**Step 1: Setup Server**
 ```bash
-# API URL (auto-configured based on environment)
-VITE_API_URL=http://localhost:3001/api          # Development
-VITE_API_URL=http://192.168.1.100:3001/api     # Production (auto-detected IP)
+# Clone repository
+git clone <your-repo-url>
+cd spending-finance-tracker
+
+# Install dependencies
+cd client && npm install
+cd ../server && npm install
+cd ..
 ```
 
-## 📦 Deployment Scripts
-
-### **1. Unified Deploy Script (`./scripts/deploy.sh`)**
-
-#### **Usage**
+**Step 2: Configure Environment**
 ```bash
-./scripts/deploy.sh [OPTIONS]
+# Create server environment file
+cp server/env.example server/.env
 
-Options:
-  -p, --platform PLATFORM  Deployment platform (vercel|local) [default: local]
-  -e, --env ENVIRONMENT     Force environment (development|production) [default: auto-detect]
-  -s, --setup              Setup environment only
-  -b, --build              Build application only
-  -h, --help               Show help message
+# Edit configuration
+nano server/.env
 ```
 
-#### **Examples**
+**Step 3: Deploy**
 ```bash
-# Auto-detect environment, deploy locally
-./scripts/deploy.sh
-
-# Force production, deploy locally
+# Build and deploy
 ./scripts/deploy.sh -e production
 
-# Deploy to Vercel with auto-detected environment
-./scripts/deploy.sh -p vercel
-
-# Setup environment files only
-./scripts/deploy.sh -s
-
-# Build application only
-./scripts/deploy.sh -b
+# Start application
+./scripts/app.sh start
 ```
 
-#### **What It Does**
-1. ✅ **Detects environment** from `server/.env`
-2. ✅ **Creates environment files** if missing
-3. ✅ **Configures CORS** automatically for production
-4. ✅ **Backs up database** before changes
-5. ✅ **Builds application** for target environment
-6. ✅ **Prepares for deployment** or deploys to Vercel
+**Step 4: Access**
+- **Local**: http://localhost:3001
+- **Network**: http://your-server-ip:3001
 
-### **2. Application Management Script (`./scripts/app.sh`)**
+### Option 2: Cloudflare Proxy Deployment
 
-#### **Usage**
-```bash
-./scripts/app.sh COMMAND [COMPONENT] [OPTIONS]
+**Step 1: Deploy Server** (same as Option 1)
 
-Commands:
-  start [server|client|all]    Start application components [default: all]
-  stop [server|client|all]     Stop application components [default: all]
-  restart [server|client|all]  Restart application components [default: all]
-  status                       Show application status
-  logs [server|client|all] [lines]  Show logs [default: all, 50 lines]
-  help                         Show help message
+**Step 2: Configure Cloudflare**
+1. **DNS Record**: Point your domain to server IP
+2. **Proxy Settings**: Enable Cloudflare proxy
+3. **SSL/TLS**: Set to "Flexible" or "Full"
+4. **Port**: Ensure 3001 is accessible or use port forwarding
+
+**Step 3: Access**
+- **HTTPS**: https://yourdomain.com (Cloudflare proxy)
+- **Direct**: http://your-server-ip:3001
+
+### Option 3: Reverse Proxy Deployment
+
+**Step 1: Deploy Server** (same as Option 1)
+
+**Step 2: Configure Reverse Proxy**
+
+**Nginx Configuration:**
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
-#### **Examples**
+**Apache Configuration:**
+```apache
+<VirtualHost *:80>
+    ServerName yourdomain.com
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:3001/
+    ProxyPassReverse / http://localhost:3001/
+</VirtualHost>
+```
+
+**iptables Port Forwarding:**
 ```bash
-# Start both server and client
+# Forward port 80 to 3001
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3001
+
+# Forward port 443 to 3001 (for HTTPS)
+sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3001
+```
+
+## 📱 Application Management
+
+### Start/Stop Commands
+```bash
+# Start application
 ./scripts/app.sh start
 
-# Start only server
-./scripts/app.sh start server
-
-# Stop everything
+# Stop application
 ./scripts/app.sh stop
 
-# Restart only client
-./scripts/app.sh restart client
+# Restart application
+./scripts/app.sh restart
 
 # Check status
 ./scripts/app.sh status
 
-# View server logs (last 100 lines)
-./scripts/app.sh logs server 100
+# View logs
+./scripts/app.sh logs
+
+# Force stop (emergency)
+./scripts/app.sh force-stop
+```
+
+### Log Management
+```bash
+# View server logs
+tail -f logs/server.log
 
 # View all logs
 ./scripts/app.sh logs
+
+# Clear logs
+rm -f logs/*.log
 ```
 
-#### **What It Does**
-1. ✅ **Manages background processes** (server & client)
-2. ✅ **Tracks PIDs** for proper process management
-3. ✅ **Logs output** to separate files
-4. ✅ **Graceful shutdown** with fallback to force kill
-5. ✅ **Status monitoring** with real-time information
-6. ✅ **Log viewing** with configurable line counts
+## 🔍 Health Checks
 
-## 🌐 Deployment Scenarios
+### Endpoints
+- **Server Health**: `http://localhost:3001/health`
+- **API Status**: `http://localhost:3001/api/status`
+- **Frontend**: `http://localhost:3001/`
 
-### **1. Local Development**
+### Status Verification
 ```bash
-# Setup
-./scripts/deploy.sh -e development -s
+# Check if server is responding
+curl http://localhost:3001/health
 
-# Build and start
-./scripts/deploy.sh -e development
-./scripts/app.sh start
+# Check API status
+curl http://localhost:3001/api/status
 
-# Access
-# Client: http://localhost:4173
-# Server: http://localhost:3001
+# Check frontend
+curl -I http://localhost:3001/
 ```
 
-### **2. Local Production**
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+**1. Server Won't Start**
 ```bash
-# Setup
-./scripts/deploy.sh -e production -s
+# Check if port is in use
+lsof -i :3001
 
-# Build and start
-./scripts/deploy.sh -e production
-./scripts/app.sh start
+# Kill processes using port 3001
+./scripts/app.sh force-stop
 
-# Access
-# Client: http://192.168.1.100:4173 (your IP)
-# Server: http://192.168.1.100:3001
+# Check server logs
+tail -n 50 logs/server.log
 ```
 
-### **3. Network Production**
+**2. Frontend Not Loading**
 ```bash
-# Auto-detects your IP and configures CORS
-./scripts/deploy.sh -e production
+# Verify client build exists
+ls -la client/dist/
 
-# Start services
-./scripts/app.sh start
+# Rebuild client if missing
+./scripts/deploy.sh
 
-# Access from any device on network
-# http://YOUR_IP:4173
+# Check server is serving static files
+curl -I http://localhost:3001/
 ```
 
-### **4. Vercel Deployment**
+**3. API Not Working**
 ```bash
-# Deploy to Vercel (production)
-./scripts/deploy.sh -p vercel -e production
+# Test API endpoint
+curl http://localhost:3001/api/status
 
-# Deploy to Vercel (preview)
-./scripts/deploy.sh -p vercel -e development
+# Check server environment
+cat server/.env | grep NODE_ENV
+
+# Verify database exists
+ls -la server/data/
 ```
 
-## 🗄️ Database Management
-
-### **Automatic Backup**
-- ✅ **Pre-deployment backup** before any changes
-- ✅ **Timestamped backups** (`spending-YYYYMMDD-HHMMSS.db`)
-- ✅ **Retention policy** (keeps last 5 backups)
-- ✅ **Backup location**: `{DATABASE_DIR}/backups/`
-
-### **Database Location**
+**4. Environment Issues**
 ```bash
-# Development/Production
-DATABASE_PATH=./data/spending.db
-
-# Backups
-./data/backups/spending-20241201-143022.db
-```
-
-## 📊 Monitoring & Logs
-
-### **Application Status**
-```bash
-# Check if services are running
+# Check environment detection
 ./scripts/app.sh status
 
-# Output example:
-# Application Status
-# Environment: production
-# 
-# Server: Running (PID: 12345)
-#   Log: /path/to/logs/server.log
-#   URL: http://localhost:3001
-# 
-# Client: Running (PID: 12346)
-#   Log: /path/to/logs/client.log
-#   URL: http://localhost:4173
+# Verify NODE_ENV
+echo $NODE_ENV
+
+# Recreate environment file
+cp server/env.example server/.env
 ```
 
-### **Log Files**
-```bash
-# Log locations
-logs/server.log    # Server output
-logs/client.log    # Client output
+### Debug Mode
 
-# View logs
-./scripts/app.sh logs server     # Server logs
-./scripts/app.sh logs client     # Client logs
-./scripts/app.sh logs all        # All logs
+**Enable Debug Logging:**
+```bash
+# Start with debug output
+DEBUG=* ./scripts/app.sh start
+
+# View detailed logs
+tail -f logs/server.log
 ```
 
-### **Process Management**
+**Check Process Status:**
 ```bash
-# PID files (auto-managed)
-server/.server.pid    # Server process ID
-client/.client.pid    # Client process ID
-```
-
-## 🔒 Security Considerations
-
-### **Production Security**
-- ✅ **Strong JWT secrets** (change defaults)
-- ✅ **Secure session secrets** (change defaults)
-- ✅ **CORS configuration** (auto-configured for network)
-- ✅ **Database permissions** (user-only access)
-
-### **Environment Variables**
-```bash
-# Required for production
-JWT_SECRET=your_unique_jwt_secret_here
-SESSION_SECRET=your_unique_session_secret_here
-
-# Optional for enhanced security
-GOOGLE_CLIENT_ID=your_google_oauth_id
-GOOGLE_CLIENT_SECRET=your_google_oauth_secret
-```
-
-## 🚨 Troubleshooting
-
-### **Common Issues**
-
-#### **1. CORS Errors**
-```bash
-# Rebuild with correct environment
-./scripts/deploy.sh -e production -b
-./scripts/app.sh restart
-```
-
-#### **2. Port Already in Use**
-```bash
-# Stop existing processes
-./scripts/app.sh stop
-
-# Check for zombie processes
+# List all node processes
 ps aux | grep node
 
-# Kill if necessary
-kill -9 PID
-```
+# Check port usage
+netstat -tulpn | grep :3001
 
-#### **3. Database Issues**
-```bash
-# Check database file
-ls -la server/data/spending.db
-
-# Check permissions
-chmod 644 server/data/spending.db
-
-# Restore from backup
-cp server/data/backups/spending-*.db server/data/spending.db
-```
-
-#### **4. Build Failures**
-```bash
-# Clean and rebuild
-rm -rf client/dist server/node_modules client/node_modules
-./scripts/deploy.sh -b
-```
-
-### **Log Analysis**
-```bash
-# Check recent errors
-./scripts/app.sh logs server | grep -i error
-./scripts/app.sh logs client | grep -i error
-
-# Monitor real-time
-tail -f logs/server.log
-tail -f logs/client.log
-```
-
-## 🎯 Best Practices
-
-### **1. Environment Management**
-- ✅ Use separate `.env` files for different environments
-- ✅ Never commit secrets to version control
-- ✅ Regularly rotate JWT and session secrets
-
-### **2. Deployment Workflow**
-```bash
-# 1. Setup environment
-./scripts/deploy.sh -s
-
-# 2. Build application
-./scripts/deploy.sh -b
-
-# 3. Start services
-./scripts/app.sh start
-
-# 4. Monitor status
+# Check application status
 ./scripts/app.sh status
 ```
 
-### **3. Maintenance**
+## 🔐 Security Considerations
+
+### Production Security
 ```bash
-# Regular backup check
-ls -la server/data/backups/
+# Set secure secrets
+JWT_SECRET=$(openssl rand -base64 32)
+SESSION_SECRET=$(openssl rand -base64 32)
 
-# Log rotation (if needed)
-./scripts/app.sh logs server 1000 > archive/server-$(date +%Y%m%d).log
+# Set proper file permissions
+chmod 600 server/.env
+chmod 755 scripts/*.sh
 
-# Process monitoring
-./scripts/app.sh status
+# Configure firewall
+sudo ufw allow 3001/tcp
 ```
 
-## 🎉 Quick Reference
+### SSL/HTTPS Setup
 
-### **Essential Commands**
+**Option 1: Cloudflare (Recommended)**
+- Enable Cloudflare proxy
+- Set SSL/TLS to "Full" or "Flexible"
+- Automatic certificate management
+
+**Option 2: Let's Encrypt with Nginx**
 ```bash
-# Deploy and start
-./scripts/deploy.sh && ./scripts/app.sh start
+# Install certbot
+sudo apt install certbot python3-certbot-nginx
 
-# Stop everything
-./scripts/app.sh stop
+# Get certificate
+sudo certbot --nginx -d yourdomain.com
 
-# Restart after changes
-./scripts/app.sh restart
-
-# Check status
-./scripts/app.sh status
-
-# View logs
-./scripts/app.sh logs
+# Configure nginx to proxy to 3001
 ```
 
-### **File Structure**
-```
-scripts/
-├── deploy.sh          # Unified deployment script
-└── app.sh             # Application management script
+**Option 3: Self-Signed Certificate**
+```bash
+# Generate certificate
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
 
-logs/
-├── server.log         # Server output
-└── client.log         # Client output
-
-server/
-├── .env               # Server configuration
-├── .server.pid        # Server process ID
-└── data/
-    ├── spending.db    # Main database
-    └── backups/       # Database backups
-
-client/
-├── .env               # Client configuration
-├── .client.pid        # Client process ID
-└── dist/              # Built application
+# Configure reverse proxy with SSL
 ```
 
-**Your application is now ready for seamless deployment and management! 🚀**
+## 📊 Performance Optimization
+
+### Server Optimization
+```bash
+# Enable gzip compression (built into Express)
+# Static file caching (configured automatically)
+# Database optimization (SQLite with indexing)
+```
+
+### Client Optimization
+```bash
+# Build optimization (Vite production build)
+# Asset compression (automatic)
+# Lazy loading (implemented)
+```
+
+### Monitoring
+```bash
+# Check memory usage
+free -h
+
+# Check disk usage
+df -h
+
+# Monitor server logs
+tail -f logs/server.log | grep ERROR
+```
+
+## 🚀 Scaling Considerations
+
+### Horizontal Scaling
+- Use load balancer (nginx, HAProxy)
+- Share SQLite database or migrate to PostgreSQL
+- Use Redis for session storage
+
+### Vertical Scaling
+- Increase server resources (CPU, RAM)
+- Optimize database queries
+- Enable caching layers
+
+### CDN Integration
+- Use Cloudflare for static assets
+- Enable browser caching
+- Optimize image delivery
+
+## 📋 Deployment Checklist
+
+### Pre-Deployment
+- [ ] Server has Node.js 18+
+- [ ] Git repository cloned
+- [ ] Dependencies installed
+- [ ] Environment variables configured
+- [ ] Database directory writable
+- [ ] Port 3001 available
+
+### Deployment
+- [ ] Run `./scripts/deploy.sh -e production`
+- [ ] Verify client build created (`client/dist/`)
+- [ ] Start server with `./scripts/app.sh start`
+- [ ] Check health endpoints
+- [ ] Test frontend and API
+
+### Post-Deployment
+- [ ] Configure reverse proxy/SSL (if needed)
+- [ ] Set up monitoring
+- [ ] Configure backups
+- [ ] Document access URLs
+- [ ] Test all functionality
+
+## 📞 Support
+
+For deployment issues:
+
+1. **Check Logs**: `./scripts/app.sh logs`
+2. **Verify Status**: `./scripts/app.sh status`
+3. **Test Health**: `curl http://localhost:3001/health`
+4. **Force Restart**: `./scripts/app.sh restart`
+
+---
+
+**Single-server deployment makes everything simpler! 🚀**

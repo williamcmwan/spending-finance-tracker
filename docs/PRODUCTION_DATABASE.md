@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 
-This guide covers the recommended database configurations for production deployment of the Spending Finance Tracker.
+This guide covers the recommended database configurations for production deployment of the Spending Finance Tracker with **single-server architecture**.
 
 ## 🎯 Database Location Recommendations
 
