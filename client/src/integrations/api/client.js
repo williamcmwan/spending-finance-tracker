@@ -1,12 +1,8 @@
 // Simple API URL configuration
 const getApiBaseUrl = () => {
-  // In production, client and server are served from same origin - use relative URLs
-  if (import.meta.env.PROD) {
-    return '/api';
-  }
-  
-  // In development, use configured API URL or default
-  return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  // Single-server deployment: client and server are always served from same origin
+  // Use relative URLs for both development and production
+  return '/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();

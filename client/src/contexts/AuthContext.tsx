@@ -80,11 +80,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loginWithGoogle = () => {
     setError(null);
-    // Redirect to Google OAuth endpoint
-    const apiBaseUrl = import.meta.env.PROD 
-      ? '/api' 
-      : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
-    const googleAuthUrl = `${apiBaseUrl}/auth/google`;
+    // Single-server deployment: always use relative URLs
+    const googleAuthUrl = '/api/auth/google';
     window.location.href = googleAuthUrl;
   };
 

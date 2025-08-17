@@ -141,13 +141,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Serve static files from client build (for production)
+// Serve static files from client build (single-server deployment)
 const clientBuildPath = path.join(__dirname, '../../client/dist');
 
 // Check if client build exists
 const hasClientBuild = fs.existsSync(clientBuildPath) && fs.existsSync(path.join(clientBuildPath, 'index.html'));
 
-if (process.env.NODE_ENV === 'production' && hasClientBuild) {
+if (hasClientBuild) {
   console.log(`📁 Serving static files from: ${clientBuildPath}`);
   
   // Serve static assets with proper headers
@@ -170,22 +170,18 @@ if (process.env.NODE_ENV === 'production' && hasClientBuild) {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
 } else {
-  // Development mode or no client build
-  if (process.env.NODE_ENV === 'production' && !hasClientBuild) {
-    console.warn(`⚠️  Production mode but no client build found at: ${clientBuildPath}`);
-    console.warn(`⚠️  Run './scripts/deploy.sh -e production' to build client files`);
-  }
+  // No client build available
+  console.warn(`⚠️  No client build found at: ${clientBuildPath}`);
+  console.warn(`⚠️  Run './scripts/deploy.sh' to build client files for single-server deployment`);
   
-  // 404 handler for development (when client runs separately)
+  // 404 handler when no client build is available
   app.use('*', (req, res) => {
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'API route not found' });
     }
     res.status(404).json({ 
-      error: 'Route not found', 
-      message: process.env.NODE_ENV === 'production' 
-        ? 'Client build not found - run deployment script first'
-        : 'Development mode - client should run separately on port 4173'
+      error: 'Client build not found', 
+      message: 'Run ./scripts/deploy.sh to build client files for single-server deployment'
     });
   });
 }
@@ -198,16 +194,15 @@ app.listen(PORT, HOST, () => {
   console.log(`🔗 API status: http://localhost:${PORT}/api/status`);
   
   // Show access information
-  if (process.env.NODE_ENV === 'production') {
-    console.log(`🌐 Network access: http://${HOST}:${PORT}`);
-    if (hasClientBuild) {
-      console.log(`🌍 Frontend: http://${HOST}:${PORT}/`);
-      console.log(`🔐 For HTTPS access, configure reverse proxy (nginx/Cloudflare)`);
-    } else {
-      console.log(`⚠️  No client build - frontend not served`);
-    }
+  console.log(`🌐 Network access: http://${HOST}:${PORT}`);
+  
+  if (hasClientBuild) {
+    console.log(`🌍 Frontend: http://${HOST}:${PORT}/`);
+    console.log(`🔄 Single-server deployment: Frontend + API on same port`);
+    console.log(`🔐 For HTTPS access, configure reverse proxy (nginx/Cloudflare)`);
   } else {
-    console.log(`🛠️  Development mode - frontend runs separately on port 4173`);
+    console.log(`⚠️  No client build - API only mode`);
+    console.log(`📝 Run './scripts/deploy.sh' to build client for single-server deployment`);
   }
   
   console.log(`📂 Environment: ${process.env.NODE_ENV || 'development'}`);
