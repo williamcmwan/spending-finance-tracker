@@ -5,17 +5,25 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Disable host checking for reverse proxy setups
+  define: {
+    __VITE_DISABLE_HOST_CHECK__: true
+  },
   server: {
     host: "::",
     port: 8080,
     allowedHosts: "all"
   },
   preview: {
-    host: "::",
+    host: "0.0.0.0",
     port: 4173,
     allowedHosts: "all",
-    proxy: {
-      // Handle reverse proxy headers from Cloudflare
+    strictPort: false,
+    cors: true,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': '*'
     }
   },
   plugins: [
