@@ -167,23 +167,37 @@ start_client() {
 stop_server() {
     print_status "Stopping server..."
     
-    # Kill by PID file first
+    # Kill by PID file first (most reliable method)
     if [ -f "$SERVER_PID_FILE" ]; then
         local pid=$(cat "$SERVER_PID_FILE")
-        if [ -n "$pid" ]; then
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
             print_status "Stopping server (PID: $pid)..."
             kill -TERM "$pid" 2>/dev/null || true
             sleep 2
-            kill -9 "$pid" 2>/dev/null || true
+            # Check if process is still running before force kill
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+            fi
         fi
         rm -f "$SERVER_PID_FILE"
     fi
     
-    # Kill any remaining server processes
+    # Kill any remaining server processes (only from this project directory)
     print_status "Cleaning up any remaining server processes..."
-    pkill -f "npm.*start" 2>/dev/null || true
-    pkill -f "node.*server" 2>/dev/null || true
-    pkill -f "spending-finance-tracker.*server" 2>/dev/null || true
+    local project_path="$(cd "$(dirname "$0")/.." && pwd)"
+    pkill -f "$project_path/server" 2>/dev/null || true
+    
+    # Only kill processes on port 3001 if they're from our project
+    local port_processes=$(lsof -ti:3001 2>/dev/null || echo "")
+    if [ -n "$port_processes" ]; then
+        for pid in $port_processes; do
+            local cmd=$(ps -p $pid -o command= 2>/dev/null || echo "")
+            if echo "$cmd" | grep -q "$project_path"; then
+                print_status "Killing process on port 3001 (PID: $pid)"
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+        done
+    fi
     
     print_success "Server stopped"
 }
@@ -192,24 +206,37 @@ stop_server() {
 stop_client() {
     print_status "Stopping client..."
     
-    # Kill by PID file first
+    # Kill by PID file first (most reliable method)
     if [ -f "$CLIENT_PID_FILE" ]; then
         local pid=$(cat "$CLIENT_PID_FILE")
-        if [ -n "$pid" ]; then
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
             print_status "Stopping client (PID: $pid)..."
             kill -TERM "$pid" 2>/dev/null || true
             sleep 2
-            kill -9 "$pid" 2>/dev/null || true
+            # Check if process is still running before force kill
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+            fi
         fi
         rm -f "$CLIENT_PID_FILE"
     fi
     
-    # Kill any remaining client processes
+    # Kill any remaining client processes (only from this project directory)
     print_status "Cleaning up any remaining client processes..."
-    pkill -f "npm.*serve" 2>/dev/null || true
-    pkill -f "npm.*preview" 2>/dev/null || true
-    pkill -f "vite.*preview" 2>/dev/null || true
-    lsof -ti:4173 | xargs -r kill -9 2>/dev/null || true
+    local project_path="$(cd "$(dirname "$0")/.." && pwd)"
+    pkill -f "$project_path/client" 2>/dev/null || true
+    
+    # Only kill processes on port 4173 if they're from our project
+    local port_processes=$(lsof -ti:4173 2>/dev/null || echo "")
+    if [ -n "$port_processes" ]; then
+        for pid in $port_processes; do
+            local cmd=$(ps -p $pid -o command= 2>/dev/null || echo "")
+            if echo "$cmd" | grep -q "$project_path"; then
+                print_status "Killing process on port 4173 (PID: $pid)"
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+        done
+    fi
     
     print_success "Client stopped"
 }
