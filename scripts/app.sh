@@ -187,16 +187,45 @@ stop_server() {
     local project_path="$(cd "$(dirname "$0")/.." && pwd)"
     pkill -f "$project_path/server" 2>/dev/null || true
     
-    # Only kill processes on port 3001 if they're from our project
+    # Enhanced port 3001 cleanup for production
     local port_processes=$(lsof -ti:3001 2>/dev/null || echo "")
     if [ -n "$port_processes" ]; then
+        print_status "Found processes on port 3001: $port_processes"
         for pid in $port_processes; do
             local cmd=$(ps -p $pid -o command= 2>/dev/null || echo "")
-            if echo "$cmd" | grep -q "$project_path"; then
-                print_status "Killing process on port 3001 (PID: $pid)"
-                kill -9 "$pid" 2>/dev/null || true
+            print_status "Checking process $pid: $cmd"
+            
+            # Check if it's our project or a Node.js process on port 3001
+            if echo "$cmd" | grep -q "$project_path" || echo "$cmd" | grep -q "node.*3001" || echo "$cmd" | grep -q "npm.*start"; then
+                print_status "Attempting to kill process on port 3001 (PID: $pid)"
+                
+                # Try multiple kill methods
+                kill -TERM "$pid" 2>/dev/null || true
+                sleep 3
+                
+                if kill -0 "$pid" 2>/dev/null; then
+                    print_status "Process still running, trying KILL signal..."
+                    kill -9 "$pid" 2>/dev/null || true
+                    sleep 2
+                fi
+                
+                # Final check with sudo if needed
+                if kill -0 "$pid" 2>/dev/null; then
+                    print_warning "Process $pid still running, may need manual intervention"
+                    print_status "Try: sudo kill -9 $pid"
+                fi
+            else
+                print_status "Process $pid doesn't belong to our project, skipping"
             fi
         done
+    fi
+    
+    # Double-check port is free
+    if lsof -ti:3001 >/dev/null 2>&1; then
+        print_warning "Port 3001 is still in use after cleanup"
+        print_status "Run 'lsof -i:3001' to see what's using the port"
+    else
+        print_status "Port 3001 is now free"
     fi
     
     print_success "Server stopped"
@@ -317,6 +346,44 @@ show_logs() {
     esac
 }
 
+# Function to force stop (for production issues)
+force_stop_application() {
+    print_warning "Force stopping application (use with caution)..."
+    
+    # Force kill all processes on our ports
+    print_status "Force killing processes on port 3001..."
+    lsof -ti:3001 | xargs -r kill -9 2>/dev/null || true
+    
+    print_status "Force killing processes on port 4173..."
+    lsof -ti:4173 | xargs -r kill -9 2>/dev/null || true
+    
+    # Clean up PID files
+    rm -f "$SERVER_PID_FILE" "$CLIENT_PID_FILE" 2>/dev/null || true
+    
+    # Kill any remaining processes from our project
+    local project_path="$(cd "$(dirname "$0")/.." && pwd)"
+    pkill -9 -f "$project_path" 2>/dev/null || true
+    
+    sleep 2
+    
+    # Verify ports are free
+    if lsof -ti:3001 >/dev/null 2>&1; then
+        print_error "Port 3001 still in use after force stop"
+        lsof -i:3001
+    else
+        print_success "Port 3001 is free"
+    fi
+    
+    if lsof -ti:4173 >/dev/null 2>&1; then
+        print_error "Port 4173 still in use after force stop"
+        lsof -i:4173
+    else
+        print_success "Port 4173 is free"
+    fi
+    
+    print_success "Force stop completed"
+}
+
 # Function to show usage
 show_usage() {
     echo "Usage: $0 COMMAND [OPTIONS]"
@@ -324,6 +391,7 @@ show_usage() {
     echo "Commands:"
     echo "  start [server|client|all]    Start application components [default: all]"
     echo "  stop [server|client|all]     Stop application components [default: all]"
+    echo "  force-stop                   Force stop all processes (production emergency)"
     echo "  restart [server|client|all]  Restart application components [default: all]"
     echo "  status                       Show application status"
     echo "  logs [server|client|all] [lines]  Show logs [default: all, 50 lines]"
@@ -385,6 +453,9 @@ main() {
                     exit 1
                     ;;
             esac
+            ;;
+        "force-stop")
+            force_stop_application
             ;;
         "restart")
             case "$component" in
