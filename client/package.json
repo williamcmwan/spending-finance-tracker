@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "serve": "npx serve dist -s -p 4173 --cors",
-    "serve-simple": "npx http-server dist -p 4173 -c-1 --cors -P http://localhost:4173?",
+    "serve-simple": "npx http-server dist -p 4173 -c-1 --cors",
     "type-check": "tsc --noEmit",
     "test": "echo \"No tests specified\" && exit 0"
   },
@@ -70,6 +70,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "serve": "^14.2.3",
+    "http-server": "^14.1.1",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
