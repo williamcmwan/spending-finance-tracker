@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "A modern, full-stack finance tracking application with drag-and-drop import and intelligent category management",
   "private": true,
-  "workspaces": [
-    "client",
-    "server"
-  ],
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "cd client && npm run dev",

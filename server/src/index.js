@@ -146,10 +146,16 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 API status: http://localhost:${PORT}/api/status`);
+  
+  // Show network access info for production
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`🌐 Network access: http://${HOST}:${PORT}`);
+  }
 });
 
 export default app;

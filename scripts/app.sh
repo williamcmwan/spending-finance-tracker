@@ -142,9 +142,9 @@ start_client() {
         return 1
     fi
     
-    # Start client in background and capture PID (using serve instead of vite preview)
-    print_status "Starting client with 'serve' package (no host checking)..."
-    nohup npm run serve-simple > "$CLIENT_LOG" 2>&1 &
+    # Start client with Vite preview (stable, with no host restrictions)
+    print_status "Starting Vite preview server on 0.0.0.0:4173 (accessible from any host)..."
+    nohup npm run serve > "$CLIENT_LOG" 2>&1 &
     local client_pid=$!
     
     # Save PID to file
@@ -167,32 +167,23 @@ start_client() {
 stop_server() {
     print_status "Stopping server..."
     
-    if ! is_running "$SERVER_PID_FILE"; then
-        print_warning "Server is not running"
-        return 0
+    # Kill by PID file first
+    if [ -f "$SERVER_PID_FILE" ]; then
+        local pid=$(cat "$SERVER_PID_FILE")
+        if [ -n "$pid" ]; then
+            print_status "Stopping server (PID: $pid)..."
+            kill -TERM "$pid" 2>/dev/null || true
+            sleep 2
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "$SERVER_PID_FILE"
     fi
     
-    local pid=$(cat "$SERVER_PID_FILE")
-    
-    # Try graceful shutdown first
-    kill "$pid" 2>/dev/null || true
-    
-    # Wait for graceful shutdown
-    local count=0
-    while [ $count -lt 10 ] && is_running "$SERVER_PID_FILE"; do
-        sleep 1
-        count=$((count + 1))
-    done
-    
-    # Force kill if still running
-    if is_running "$SERVER_PID_FILE"; then
-        print_warning "Server did not stop gracefully, forcing shutdown..."
-        kill -9 "$pid" 2>/dev/null || true
-        sleep 1
-    fi
-    
-    # Clean up PID file
-    rm -f "$SERVER_PID_FILE"
+    # Kill any remaining server processes
+    print_status "Cleaning up any remaining server processes..."
+    pkill -f "npm.*start" 2>/dev/null || true
+    pkill -f "node.*server" 2>/dev/null || true
+    pkill -f "spending-finance-tracker.*server" 2>/dev/null || true
     
     print_success "Server stopped"
 }
@@ -201,32 +192,24 @@ stop_server() {
 stop_client() {
     print_status "Stopping client..."
     
-    if ! is_running "$CLIENT_PID_FILE"; then
-        print_warning "Client is not running"
-        return 0
+    # Kill by PID file first
+    if [ -f "$CLIENT_PID_FILE" ]; then
+        local pid=$(cat "$CLIENT_PID_FILE")
+        if [ -n "$pid" ]; then
+            print_status "Stopping client (PID: $pid)..."
+            kill -TERM "$pid" 2>/dev/null || true
+            sleep 2
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "$CLIENT_PID_FILE"
     fi
     
-    local pid=$(cat "$CLIENT_PID_FILE")
-    
-    # Try graceful shutdown first
-    kill "$pid" 2>/dev/null || true
-    
-    # Wait for graceful shutdown
-    local count=0
-    while [ $count -lt 10 ] && is_running "$CLIENT_PID_FILE"; do
-        sleep 1
-        count=$((count + 1))
-    done
-    
-    # Force kill if still running
-    if is_running "$CLIENT_PID_FILE"; then
-        print_warning "Client did not stop gracefully, forcing shutdown..."
-        kill -9 "$pid" 2>/dev/null || true
-        sleep 1
-    fi
-    
-    # Clean up PID file
-    rm -f "$CLIENT_PID_FILE"
+    # Kill any remaining client processes
+    print_status "Cleaning up any remaining client processes..."
+    pkill -f "npm.*serve" 2>/dev/null || true
+    pkill -f "npm.*preview" 2>/dev/null || true
+    pkill -f "vite.*preview" 2>/dev/null || true
+    lsof -ti:4173 | xargs -r kill -9 2>/dev/null || true
     
     print_success "Client stopped"
 }

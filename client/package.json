@@ -4,16 +4,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
-    "build:prod": "vite build --mode production",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "preview": "vite preview",
-    "serve": "npx serve dist -s -p 4173 --cors",
-    "serve-simple": "npx http-server dist -p 4173 -c-1 --cors",
-    "type-check": "tsc --noEmit",
+    "dev": "npx vite",
+    "build": "npx vite build --mode production",
+    "lint": "npx eslint .",
+    "lint:fix": "npx eslint . --fix",
+    "preview": "npx vite preview --host 0.0.0.0 --port 4173",
+    "serve": "npx vite preview --host 0.0.0.0 --port 4173",
+    "type-check": "npx tsc --noEmit",
     "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
@@ -69,8 +66,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "serve": "^14.2.3",
-    "http-server": "^14.1.1",
+
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",

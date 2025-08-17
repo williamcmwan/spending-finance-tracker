@@ -3,52 +3,21 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// https://vitejs.dev/config/
+// Simplified Vite config optimized for Cloudflare proxy setup
 export default defineConfig(({ mode }) => ({
-  // Disable host checking for reverse proxy setups
-  define: {
-    __VITE_DISABLE_HOST_CHECK__: true
-  },
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
     allowedHosts: "all"
   },
   preview: {
-    host: "0.0.0.0",
+    host: "0.0.0.0", 
     port: 4173,
-    allowedHosts: "all",
-    strictPort: false,
-    cors: true,
-    disableHostCheck: true,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': '*'
-    }
+    allowedHosts: "all"
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
-    // Custom plugin to completely disable host checking
-    {
-      name: 'disable-host-check',
-      configureServer(server) {
-        server.middlewares.use('/', (req, res, next) => {
-          // Override host header validation
-          req.headers.host = 'localhost:4173';
-          next();
-        });
-      },
-      configurePreviewServer(server) {
-        server.middlewares.use('/', (req, res, next) => {
-          // Override host header validation for preview
-          req.headers.host = 'localhost:4173';
-          next();
-        });
-      }
-    }
+    mode === 'development' && componentTagger()
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -56,6 +25,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    outDir: "dist",
+    emptyOutDir: true,
     rollupOptions: {
       output: {
         manualChunks: {

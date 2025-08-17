@@ -175,20 +175,65 @@ build_application() {
     
     # Build client
     print_status "Building client..."
-    cd client
-    npm install
     
-    if [ "$environment" = "production" ]; then
-        npm run build:prod
-    else
-        npm run build
+    # Ensure we're in the project root
+    if [ ! -d "client" ]; then
+        print_error "Client directory not found. Make sure you're in the project root."
+        exit 1
     fi
+    
+    # Build client
+    print_status "Building client..."
+    cd client
+    
+    # Ensure dependencies are installed
+    if [ ! -d "node_modules" ]; then
+        print_status "Installing client dependencies..."
+        npm install
+    fi
+    
+    # Create production environment file
+    print_status "Configuring client API URL..."
+    # Get the primary network interface IP (works on both Linux and macOS)
+    local server_ip=$(ifconfig | grep -E "inet [0-9]" | grep -v "127.0.0.1" | head -1 | awk '{print $2}' | sed 's/addr://' 2>/dev/null || echo "192.168.20.30")
+    echo "# Auto-generated client environment for production" > .env
+    echo "VITE_API_URL=http://${server_ip}:3001/api" >> .env
+    print_status "Client API URL set to: http://${server_ip}:3001/api"
+    
+    # Clean any problematic temp files
+    rm -rf node_modules/.vite-temp .vite 2>/dev/null || true
+    
+    # Build for production
+    print_status "Building client for production..."
+    npm run build
+    
+    # Verify build was successful
+    if [ ! -d "dist" ]; then
+        print_error "Build failed - dist directory not created"
+        exit 1
+    fi
+    
     cd ..
     
     # Prepare server
     print_status "Preparing server..."
     cd server
     npm install
+    
+    # Set server host for production
+    if [ "$environment" = "production" ]; then
+        print_status "Configuring server for network access..."
+        if [ ! -f ".env" ]; then
+            cp env.example .env
+        fi
+        # Update or add HOST setting
+        if grep -q "^HOST=" .env; then
+            sed -i.bak 's/^HOST=.*/HOST=0.0.0.0/' .env
+        else
+            echo "HOST=0.0.0.0" >> .env
+        fi
+    fi
+    
     cd ..
     
     print_success "Build completed successfully for: $environment"
