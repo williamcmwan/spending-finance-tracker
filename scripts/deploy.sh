@@ -194,11 +194,11 @@ build_application() {
     
     # Create production environment file
     print_status "Configuring client API URL..."
-    # Get the primary network interface IP (works on both Linux and macOS)
-    local server_ip=$(ifconfig | grep -E "inet [0-9]" | grep -v "127.0.0.1" | head -1 | awk '{print $2}' | sed 's/addr://' 2>/dev/null || echo "192.168.20.30")
+    # For production, use relative URL to work with HTTPS through Cloudflare
     echo "# Auto-generated client environment for production" > .env
-    echo "VITE_API_URL=http://${server_ip}:3001/api" >> .env
-    print_status "Client API URL set to: http://${server_ip}:3001/api"
+    echo "# Use relative URL for Cloudflare proxy compatibility" >> .env
+    echo "VITE_API_URL=/api" >> .env
+    print_status "Client API URL set to: /api (relative URL for Cloudflare proxy)"
     
     # Clean any problematic temp files
     rm -rf node_modules/.vite-temp .vite 2>/dev/null || true

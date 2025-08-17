@@ -1,4 +1,20 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Dynamic API URL based on current protocol and host
+const getApiBaseUrl = () => {
+  // If we have a specific API URL configured, use it (for development)
+  if (import.meta.env.VITE_API_URL && !window.location.href.includes('finance.shopassist.dpdns.org')) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // For production through Cloudflare, use relative URL so it goes through the proxy
+  if (window.location.href.includes('finance.shopassist.dpdns.org')) {
+    return '/api';
+  }
+  
+  // Default fallback
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiClient {
   constructor() {

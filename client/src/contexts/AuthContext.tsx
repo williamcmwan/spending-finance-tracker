@@ -81,7 +81,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loginWithGoogle = () => {
     setError(null);
     // Redirect to Google OAuth endpoint
-    const googleAuthUrl = `${import.meta.env.VITE_API_URL}/auth/google`;
+    const apiBaseUrl = window.location.href.includes('finance.shopassist.dpdns.org') 
+      ? '/api' 
+      : (import.meta.env.VITE_API_URL || 'http://localhost:3001/api');
+    const googleAuthUrl = `${apiBaseUrl}/auth/google`;
     window.location.href = googleAuthUrl;
   };
 
