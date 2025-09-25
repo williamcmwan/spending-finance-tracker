@@ -38,6 +38,8 @@ export function initializeDatabase() {
       password TEXT NOT NULL,
       name TEXT,
       google_id TEXT UNIQUE,
+      totp_secret TEXT,
+      totp_enabled INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -83,9 +85,47 @@ export function initializeDatabase() {
       console.error('Error creating tables:', err.message);
     } else {
       console.log('Database tables initialized successfully');
-      seedDefaultData();
+      ensureUserTableColumns()
+        .then(() => seedDefaultData())
+        .catch((e) => {
+          console.error('Error ensuring user columns:', e.message);
+          seedDefaultData();
+        });
     }
   });
+}
+
+// Ensure new columns exist for TOTP without breaking existing DBs
+function columnExists(tableName, columnName) {
+  return new Promise((resolve, reject) => {
+    db.all(`PRAGMA table_info(${tableName});`, [], (err, rows) => {
+      if (err) return reject(err);
+      const exists = rows.some((r) => r.name === columnName);
+      resolve(exists);
+    });
+  });
+}
+
+async function ensureUserTableColumns() {
+  const hasTotpSecret = await columnExists('users', 'totp_secret');
+  if (!hasTotpSecret) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE users ADD COLUMN totp_secret TEXT;', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  const hasTotpEnabled = await columnExists('users', 'totp_enabled');
+  if (!hasTotpEnabled) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0;', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
 }
 
 // Seed default data

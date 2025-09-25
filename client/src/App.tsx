@@ -12,7 +12,6 @@ import Analytics from "./pages/Analytics";
 import Categories from "./pages/Categories";
 import Import from "./pages/Import";
 import Auth from "./pages/Auth";
-import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,7 +25,7 @@ const App = () => (
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/auth" element={<Auth />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
+            {/* Google callback removed */}
             <Route path="/*" element={
               <ProtectedRoute>
                 <DashboardLayout>

@@ -1,4 +1,4 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
 interface DashboardLayoutProps {
@@ -12,21 +12,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <AppSidebar />
         
         <div className="flex-1 flex flex-col">
-          {/* Top Header */}
-          <header className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
-            <div className="flex items-center justify-between h-full px-6">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger />
-
-              </div>
-              
-              <div className="flex items-center gap-3">
-                {/* Top right icons removed as requested */}
-              </div>
-            </div>
-          </header>
-          
-          {/* Main Content */}
+          {/* Main Content - No header to maximize space */}
           <main className="flex-1 p-6">
             {children}
           </main>

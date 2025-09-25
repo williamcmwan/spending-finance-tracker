@@ -11,10 +11,11 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requires2fa?: boolean } | void>;
   register: (email: string, password: string, name: string) => Promise<void>;
-  loginWithGoogle: () => void;
+  verifyTotp: (code: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   error: string | null;
 }
 
@@ -36,6 +37,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tempToken, setTempToken] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -56,11 +58,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await apiClient.getCurrentUser();
+      setUser(response.user);
+    } catch (e) {
+      // ignore, handled by ProtectedRoute elsewhere
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
       setError(null);
       const response = await apiClient.login({ email, password });
-      setUser(response.user);
+      console.log('Login response:', response);
+      if (response.requires2fa && response.tempToken) {
+        setTempToken(response.tempToken);
+        return { requires2fa: true };
+      }
+      // If no 2FA required, set user and return success
+      if (response.user) {
+        console.log('Setting user:', response.user);
+        setUser(response.user);
+        setLoading(false); // Ensure loading is false after successful login
+      }
     } catch (error: any) {
       setError(error.message || 'Login failed');
       throw error;
@@ -72,17 +93,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(null);
       const response = await apiClient.register({ email, password, name });
       setUser(response.user);
+      setLoading(false); // Ensure loading is false after successful registration
     } catch (error: any) {
       setError(error.message || 'Registration failed');
       throw error;
     }
   };
 
-  const loginWithGoogle = () => {
-    setError(null);
-    // Single-server deployment: always use relative URLs
-    const googleAuthUrl = '/api/auth/google';
-    window.location.href = googleAuthUrl;
+  const verifyTotp = async (code: string) => {
+    if (!tempToken) throw new Error('No 2FA session');
+    try {
+      const response = await apiClient.verifyTotp(tempToken, code);
+      setUser(response.user);
+      setTempToken(null);
+      setLoading(false); // Ensure loading is false after successful 2FA verification
+    } catch (error: any) {
+      setError(error.message || '2FA verification failed');
+      throw error;
+    }
   };
 
   const logout = () => {
@@ -96,8 +124,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     login,
     register,
-    loginWithGoogle,
+    verifyTotp,
     logout,
+    refreshUser,
     error,
   };
 

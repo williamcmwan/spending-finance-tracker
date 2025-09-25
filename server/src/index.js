@@ -7,8 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import session from 'express-session';
-import passport from './config/passport.js';
+// Removed Passport/Session (no third-party OAuth)
 
 // Database
 import { initializeDatabase } from './database/init.js';
@@ -83,20 +82,7 @@ app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware (required for Passport)
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-session-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
-
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
+// Sessions/Passport removed
 
 // Initialize database
 initializeDatabase();

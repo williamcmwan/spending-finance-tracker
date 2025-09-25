@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Chrome, ArrowRight, Shield, TrendingUp, PieChart } from 'lucide-react';
+import { ArrowRight, Shield, TrendingUp, PieChart } from 'lucide-react';
 
 const Auth = () => {
-  const { user, loading, loginWithGoogle, register, login } = useAuth();
+  const { user, loading, register, login, verifyTotp } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,16 +23,29 @@ const Auth = () => {
 
   // Redirect if already authenticated
   if (!loading && user) {
+    console.log('Auth: User authenticated, redirecting to /');
     return <Navigate to="/" replace />;
   }
 
-  const handleGoogleSignIn = async () => {
+  const [requires2fa, setRequires2fa] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
+    
     try {
-      loginWithGoogle();
+      const result = await login(formData.email, formData.password);
+      if (result && (result as any).requires2fa) {
+        setRequires2fa(true);
+      } else {
+        // Successful login without 2FA: navigate immediately
+        navigate('/');
+      }
+      // If no result or no requires2fa, login was successful and user will be redirected
     } catch (error: any) {
       toast({
-        title: "Authentication Error",
+        title: "Sign In Error",
         description: error.message,
         variant: "destructive"
       });
@@ -39,15 +53,18 @@ const Auth = () => {
     setIsLoading(false);
   };
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     try {
-      await login(formData.email, formData.password);
+      await verifyTotp(otpCode);
+      setRequires2fa(false);
+      setOtpCode('');
+      // Navigate to dashboard after successful 2FA
+      navigate('/');
     } catch (error: any) {
       toast({
-        title: "Sign In Error",
+        title: "Invalid Code",
         description: error.message,
         variant: "destructive"
       });
@@ -171,114 +188,139 @@ const Auth = () => {
 
           <Card>
             <CardHeader className="text-center">
-              <CardTitle>Welcome</CardTitle>
-              <CardDescription>
-                Sign in to your account or create a new one
-              </CardDescription>
+              {requires2fa ? (
+                <>
+                  <CardTitle>Two-Factor Verification</CardTitle>
+                  <CardDescription>Enter the 6-digit code from your authenticator app</CardDescription>
+                </>
+              ) : (
+                <>
+                  <CardTitle>Welcome</CardTitle>
+                  <CardDescription>
+                    Sign in to your account or create a new one
+                  </CardDescription>
+                </>
+              )}
             </CardHeader>
             <CardContent>
-              {/* Google Sign In Button */}
-              <Button
-                variant="outline"
-                className="w-full mb-6"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-              >
-                <Chrome className="mr-2 h-4 w-4" />
-                Continue with Google
-              </Button>
+              {requires2fa ? (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div>
+                    <Label htmlFor="otp">Authentication Code</Label>
+                    <Input
+                      id="otp"
+                      name="otp"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]{6}"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      required
+                      placeholder="Enter 6-digit code"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Verifying..." : "Verify"}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </form>
+              ) : (
+                <>
+                  <div className="relative mb-6">
+                    <Separator />
+                    <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-muted-foreground">
+                      or
+                    </span>
+                  </div>
+                </>
+              )}
 
-              <div className="relative mb-6">
-                <Separator />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-sm text-muted-foreground">
-                  or
-                </span>
-              </div>
-
-              <Tabs defaultValue="signin" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="signin">Sign In</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="signin">
-                  <form onSubmit={handleEmailSignIn} className="space-y-4">
-                    <div>
-                      <Label htmlFor="signin-email">Email</Label>
-                      <Input
-                        id="signin-email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                        placeholder="Enter your email"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="signin-password">Password</Label>
-                      <Input
-                        id="signin-password"
-                        name="password"
-                        type="password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        required
-                        placeholder="Enter your password"
-                      />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? "Signing in..." : "Sign In"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </form>
-                </TabsContent>
-                
-                <TabsContent value="signup">
-                  <form onSubmit={handleEmailSignUp} className="space-y-4">
-                    <div>
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input
-                        id="signup-email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                        placeholder="Enter your email"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="signup-password">Password</Label>
-                      <Input
-                        id="signup-password"
-                        name="password"
-                        type="password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        required
-                        placeholder="Create a password"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="confirm-password">Confirm Password</Label>
-                      <Input
-                        id="confirm-password"
-                        name="confirmPassword"
-                        type="password"
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        required
-                        placeholder="Confirm your password"
-                      />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? "Creating account..." : "Create Account"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
+              {!requires2fa && (
+                <Tabs defaultValue="signin" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="signin">Sign In</TabsTrigger>
+                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="signin">
+                    <form onSubmit={handleEmailSignIn} className="space-y-4">
+                      <div>
+                        <Label htmlFor="signin-email">Email</Label>
+                        <Input
+                          id="signin-email"
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Enter your email"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="signin-password">Password</Label>
+                        <Input
+                          id="signin-password"
+                          name="password"
+                          type="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Enter your password"
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? "Signing in..." : "Sign In"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </form>
+                  </TabsContent>
+                  
+                  <TabsContent value="signup">
+                    <form onSubmit={handleEmailSignUp} className="space-y-4">
+                      <div>
+                        <Label htmlFor="signup-email">Email</Label>
+                        <Input
+                          id="signup-email"
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Enter your email"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="signup-password">Password</Label>
+                        <Input
+                          id="signup-password"
+                          name="password"
+                          type="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Create a password"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-password">Confirm Password</Label>
+                        <Input
+                          id="confirm-password"
+                          name="confirmPassword"
+                          type="password"
+                          value={formData.confirmPassword}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Confirm your password"
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? "Creating account..." : "Create Account"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              )}
             </CardContent>
           </Card>
         </div>

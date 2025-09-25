@@ -2,8 +2,8 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import speakeasy from 'speakeasy';
 import { getRow, runQuery } from '../database/init.js';
-import passport from '../config/passport.js';
 
 const router = express.Router();
 
@@ -78,29 +78,34 @@ router.post('/login', [
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check password (skip for OAuth users)
-    if (user.password !== 'google_oauth_user') {
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
+    // Validate password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT token
+    // If TOTP is enabled, return temp token for second factor
+    if (user.totp_enabled) {
+      const tempToken = jwt.sign(
+        { userId: user.id, email: user.email, stage: '2fa' },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '10m' }
+      );
+
+      return res.json({ requires2fa: true, tempToken });
+    }
+
+    // Generate final JWT token (no 2FA required)
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 
-    res.json({
+    return res.json({
       message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name
-      }
+      user: { id: user.id, email: user.email, name: user.name }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -108,37 +113,140 @@ router.post('/login', [
   }
 });
 
-// Google OAuth routes (only if Google OAuth is configured)
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  router.get('/google',
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-  );
+// Remove Google OAuth routes entirely
 
-  router.get('/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login' }),
-    (req, res) => {
-      // Generate JWT token for the authenticated user
-      const token = jwt.sign(
-        { userId: req.user.id, email: req.user.email },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
-      );
-
-      // Redirect to frontend with token
-      const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/auth/callback?token=${token}`;
-      res.redirect(redirectUrl);
+// 2FA: verify TOTP for login (second step)
+router.post('/login/verify-totp', [
+  body('tempToken').notEmpty(),
+  body('code').isLength({ min: 6, max: 6 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-  );
-} else {
-  // Return error for Google OAuth routes when not configured
-  router.get('/google', (req, res) => {
-    res.status(501).json({ error: 'Google OAuth not configured' });
-  });
 
-  router.get('/google/callback', (req, res) => {
-    res.status(501).json({ error: 'Google OAuth not configured' });
-  });
-}
+    const { tempToken, code } = req.body;
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    if (decoded.stage !== '2fa') {
+      return res.status(400).json({ error: 'Invalid token stage' });
+    }
+
+    const user = await getRow('SELECT * FROM users WHERE id = ?', [decoded.userId]);
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      return res.status(400).json({ error: '2FA not enabled for user' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.totp_secret,
+      encoding: 'base32',
+      token: code,
+      window: 1
+    });
+
+    if (!verified) {
+      return res.status(401).json({ error: 'Invalid code' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      message: 'Login successful',
+      token,
+      user: { id: user.id, email: user.email, name: user.name }
+    });
+  } catch (error) {
+    console.error('2FA verify error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2FA: setup secret (requires auth)
+router.post('/totp/setup', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+    const token = authHeader.replace('Bearer ', '');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const user = await getRow('SELECT * FROM users WHERE id = ?', [decoded.userId]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const secret = speakeasy.generateSecret({
+      name: `FinanceTracker (${user.email})`
+    });
+
+    await runQuery('UPDATE users SET totp_secret = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [secret.base32, user.id]);
+
+    return res.json({
+      otpauth_url: secret.otpauth_url,
+      secret: secret.base32
+    });
+  } catch (error) {
+    console.error('2FA setup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2FA: enable after verifying code (requires auth)
+router.post('/totp/enable', [
+  body('code').isLength({ min: 6, max: 6 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+    const token = authHeader.replace('Bearer ', '');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { code } = req.body;
+    const user = await getRow('SELECT * FROM users WHERE id = ?', [decoded.userId]);
+    if (!user || !user.totp_secret) {
+      return res.status(400).json({ error: '2FA not set up' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.totp_secret,
+      encoding: 'base32',
+      token: code,
+      window: 1
+    });
+
+    if (!verified) {
+      return res.status(401).json({ error: 'Invalid code' });
+    }
+
+    await runQuery('UPDATE users SET totp_enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    return res.json({ message: '2FA enabled' });
+  } catch (error) {
+    console.error('2FA enable error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Get current user
 router.get('/me', async (req, res) => {
@@ -150,7 +258,7 @@ router.get('/me', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    const user = await getRow('SELECT id, email, name, created_at FROM users WHERE id = ?', [decoded.userId]);
+    const user = await getRow('SELECT id, email, name, created_at, COALESCE(totp_enabled, 0) as totp_enabled FROM users WHERE id = ?', [decoded.userId]);
     
     if (!user) {
       return res.status(401).json({ error: 'User not found' });

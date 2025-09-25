@@ -82,6 +82,28 @@ class ApiClient {
     return response;
   }
 
+  async verifyTotp(tempToken, code) {
+    const response = await this.request('/auth/login/verify-totp', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken, code })
+    });
+    if (response.token) {
+      this.setToken(response.token);
+    }
+    return response;
+  }
+
+  async totpSetup() {
+    return this.request('/auth/totp/setup', { method: 'POST' });
+  }
+
+  async totpEnable(code) {
+    return this.request('/auth/totp/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+  }
+
   async getCurrentUser() {
     return this.request('/auth/me');
   }
