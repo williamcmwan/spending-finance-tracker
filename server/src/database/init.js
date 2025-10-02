@@ -51,6 +51,7 @@ export function initializeDatabase() {
       color TEXT DEFAULT '#3B82F6',
       icon TEXT DEFAULT 'tag',
       user_id INTEGER,
+      is_once_off INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users (id)
@@ -101,6 +102,7 @@ export function initializeDatabase() {
       console.log('Database tables initialized successfully');
       ensureUserTableColumns()
         .then(() => ensureTransactionTableColumns())
+        .then(() => ensureCategoryTableColumns())
         .then(() => seedDefaultData())
         .catch((e) => {
           console.error('Error ensuring table columns:', e.message);
@@ -178,6 +180,18 @@ async function ensureTransactionTableColumns() {
   if (!hasExchangeRate) {
     await new Promise((resolve, reject) => {
       db.run('ALTER TABLE transactions ADD COLUMN exchange_rate DECIMAL(10,6);', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+}
+
+async function ensureCategoryTableColumns() {
+  const hasIsOnceOff = await columnExists('categories', 'is_once_off');
+  if (!hasIsOnceOff) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE categories ADD COLUMN is_once_off INTEGER DEFAULT 0;', [], function(err) {
         if (err) return reject(err);
         resolve();
       });

@@ -10,6 +10,9 @@ import {
   Calculator,
   FileText,
   LogOut,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 
 import {
@@ -30,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "next-themes";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -46,6 +50,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const { logout, user, refreshUser } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
 
   const handleSignOut = async () => {
     try {
@@ -210,6 +215,27 @@ export function AppSidebar() {
               </DialogContent>
             </Dialog>
           )}
+          <Button 
+            variant="outline" 
+            className={collapsed ? "w-6 h-6 p-0 mx-auto" : "w-full justify-start"} 
+            onClick={() => {
+              if (theme === 'light') setTheme('dark');
+              else if (theme === 'dark') setTheme('system');
+              else setTheme('light');
+            }}
+            title={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'} mode`}
+          >
+            {theme === 'light' ? <Sun className="h-3 w-3" /> : 
+             theme === 'dark' ? <Moon className="h-3 w-3" /> : 
+             <Monitor className="h-3 w-3" />}
+            {!collapsed && (
+              <span className="ml-2">
+                {theme === 'light' ? 'Light' : 
+                 theme === 'dark' ? 'Dark' : 
+                 'System'}
+              </span>
+            )}
+          </Button>
           <Button 
             variant="outline" 
             className={collapsed ? "w-6 h-6 p-0 mx-auto" : "w-full justify-start"} 

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Plus,
   Edit,
@@ -133,6 +134,7 @@ interface Category {
   color: string;
   icon: string;
   user_id?: number;
+  is_once_off?: boolean;
   created_at: string;
   updated_at: string;
   transaction_count?: number;
@@ -273,7 +275,8 @@ export default function Categories() {
   const [formData, setFormData] = useState({
     name: '',
     color: '#3B82F6',
-    icon: 'tag'
+    icon: 'tag',
+    is_once_off: false
   });
   const { toast } = useToast();
 
@@ -306,7 +309,7 @@ export default function Categories() {
         description: "Category created successfully",
       });
       setIsAddDialogOpen(false);
-      setFormData({ name: '', color: '#3B82F6', icon: 'tag' });
+      setFormData({ name: '', color: '#3B82F6', icon: 'tag', is_once_off: false });
       fetchCategories();
     } catch (error: any) {
       console.error('Error creating category:', error);
@@ -329,7 +332,7 @@ export default function Categories() {
       });
       setIsEditDialogOpen(false);
       setEditingCategory(null);
-      setFormData({ name: '', color: '#3B82F6', icon: 'tag' });
+      setFormData({ name: '', color: '#3B82F6', icon: 'tag', is_once_off: false });
       fetchCategories();
     } catch (error: any) {
       console.error('Error updating category:', error);
@@ -368,13 +371,14 @@ export default function Categories() {
     setFormData({
       name: category.name,
       color: category.color,
-      icon: category.icon
+      icon: category.icon,
+      is_once_off: category.is_once_off || false
     });
     setIsEditDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', color: '#3B82F6', icon: 'tag' });
+    setFormData({ name: '', color: '#3B82F6', icon: 'tag', is_once_off: false });
     setEditingCategory(null);
   };
 
@@ -489,6 +493,21 @@ export default function Categories() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="is_once_off" className="text-right">
+                  Once-off Spending
+                </Label>
+                <div className="col-span-3 flex items-center space-x-2">
+                  <Checkbox
+                    id="is_once_off"
+                    checked={formData.is_once_off}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_once_off: checked as boolean }))}
+                  />
+                  <Label htmlFor="is_once_off" className="text-sm text-muted-foreground">
+                    Mark this category for one-time expenses
+                  </Label>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button 
@@ -529,6 +548,7 @@ export default function Categories() {
                 <TableHead>Category</TableHead>
                 <TableHead>Icon</TableHead>
                 <TableHead>Color</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="w-[70px]"></TableHead>
               </TableRow>
@@ -552,6 +572,17 @@ export default function Categories() {
                         />
                         <span className="text-sm text-muted-foreground">{category.color}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {category.is_once_off ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Once-off
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Regular
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(category.created_at).toLocaleDateString()}
@@ -653,6 +684,21 @@ export default function Categories() {
                   })}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_is_once_off" className="text-right">
+                Once-off Spending
+              </Label>
+              <div className="col-span-3 flex items-center space-x-2">
+                <Checkbox
+                  id="edit_is_once_off"
+                  checked={formData.is_once_off}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_once_off: checked as boolean }))}
+                />
+                <Label htmlFor="edit_is_once_off" className="text-sm text-muted-foreground">
+                  Mark this category for one-time expenses
+                </Label>
+              </div>
             </div>
           </div>
           <DialogFooter>

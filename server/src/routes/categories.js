@@ -68,7 +68,8 @@ router.post('/', [
   authenticateToken,
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('color').optional().isHexColor().withMessage('Color must be a valid hex color'),
-  body('icon').optional().trim().notEmpty().withMessage('Icon cannot be empty')
+  body('icon').optional().trim().notEmpty().withMessage('Icon cannot be empty'),
+  body('is_once_off').optional().isBoolean().withMessage('is_once_off must be a boolean')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -76,7 +77,7 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, color = '#3B82F6', icon = 'tag' } = req.body;
+    const { name, color = '#3B82F6', icon = 'tag', is_once_off = false } = req.body;
     const capitalizedName = capitalizeFirstLetter(name);
 
     // Check if category already exists
@@ -86,8 +87,8 @@ router.post('/', [
     }
 
     const result = await runQuery(
-      'INSERT INTO categories (name, color, icon, user_id) VALUES (?, ?, ?, ?)',
-      [capitalizedName, color, icon, req.user.userId]
+      'INSERT INTO categories (name, color, icon, user_id, is_once_off) VALUES (?, ?, ?, ?, ?)',
+      [capitalizedName, color, icon, req.user.userId, is_once_off ? 1 : 0]
     );
 
     const category = await getRow('SELECT * FROM categories WHERE id = ?', [result.id]);
@@ -107,7 +108,8 @@ router.put('/:id', [
   authenticateToken,
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
   body('color').optional().isHexColor().withMessage('Color must be a valid hex color'),
-  body('icon').optional().trim().notEmpty().withMessage('Icon cannot be empty')
+  body('icon').optional().trim().notEmpty().withMessage('Icon cannot be empty'),
+  body('is_once_off').optional().isBoolean().withMessage('is_once_off must be a boolean')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -116,7 +118,7 @@ router.put('/:id', [
     }
 
     const { id } = req.params;
-    const { name, color, icon } = req.body;
+    const { name, color, icon, is_once_off } = req.body;
 
     // Check if category exists
     const existingCategory = await getRow('SELECT * FROM categories WHERE id = ?', [id]);
@@ -139,6 +141,10 @@ router.put('/:id', [
     if (icon !== undefined) {
       updates.push('icon = ?');
       params.push(icon);
+    }
+    if (is_once_off !== undefined) {
+      updates.push('is_once_off = ?');
+      params.push(is_once_off ? 1 : 0);
     }
 
     if (updates.length === 0) {

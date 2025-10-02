@@ -199,7 +199,8 @@ router.get('/', authenticateToken, async (req, res) => {
         t.*,
         c.name as category_name,
         c.color as category_color,
-        c.icon as category_icon
+        c.icon as category_icon,
+        c.is_once_off as category_is_once_off
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
       ${whereClause}
@@ -246,7 +247,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         t.*,
         c.name as category_name,
         c.color as category_color,
-        c.icon as category_icon
+        c.icon as category_icon,
+        c.is_once_off as category_is_once_off
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE t.id = ? AND t.user_id = ?
@@ -339,7 +341,8 @@ router.post('/', [
         t.*,
         c.name as category_name,
         c.color as category_color,
-        c.icon as category_icon
+        c.icon as category_icon,
+        c.is_once_off as category_is_once_off
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE t.id = ?
@@ -481,7 +484,8 @@ router.put('/:id', [
         t.*,
         c.name as category_name,
         c.color as category_color,
-        c.icon as category_icon
+        c.icon as category_icon,
+        c.is_once_off as category_is_once_off
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE t.id = ?

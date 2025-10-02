@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { getCurrencySymbol, formatAmountWithCurrency } from "@/utils/currency";
 import { 
   ChevronLeft, 
@@ -136,6 +138,7 @@ interface Transaction {
   category_name: string;
   category_color: string;
   category_icon?: string;
+  category_is_once_off?: boolean;
   source: string;
 }
 
@@ -214,6 +217,7 @@ export default function Dashboard() {
   const [selectedCategoryCount, setSelectedCategoryCount] = useState<string>("5");
   const [currentMonthPage, setCurrentMonthPage] = useState(0);
   const [baseCurrency, setBaseCurrency] = useState<string>('USD');
+  const [showOnlyRegularCategories, setShowOnlyRegularCategories] = useState<boolean>(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -620,6 +624,11 @@ export default function Dashboard() {
             return;
           }
           
+          // Filter out once-off categories if toggle is enabled
+          if (showOnlyRegularCategories && transaction.category_is_once_off) {
+            return;
+          }
+          
           const monthKey = format(new Date(transaction.date), 'MMM yyyy');
           const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
@@ -854,6 +863,13 @@ export default function Dashboard() {
       fetchMonthlyChartData(dateRange, selectedCategoryCount);
     }
   }, [selectedCategoryCount]);
+
+  // Update monthly category spending when toggle changes
+  useEffect(() => {
+    if (dateRange.from && dateRange.to) {
+      fetchMonthlyCategorySpending(dateRange);
+    }
+  }, [showOnlyRegularCategories]);
 
   // Intersection Observer for lazy loading
   const lastTransactionElementRef = useCallback((node: HTMLTableRowElement | null) => {
@@ -1203,13 +1219,25 @@ export default function Dashboard() {
       {/* Category Spending Analysis */}
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>
-            Spending by Category (Expenses Only) - {dateRange.from && dateRange.to ? (
-              `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
-            ) : (
-              'Select date range'
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Spending by Category (Expenses Only) - {dateRange.from && dateRange.to ? (
+                `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
+              ) : (
+                'Select date range'
+              )}
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="regular-categories-only"
+                checked={showOnlyRegularCategories}
+                onCheckedChange={setShowOnlyRegularCategories}
+              />
+              <Label htmlFor="regular-categories-only" className="text-sm font-normal">
+                Regular categories only
+              </Label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-4 overflow-hidden">
           {loading ? (
