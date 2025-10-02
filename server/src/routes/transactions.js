@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import { getRow, getRows, runQuery } from '../database/init.js';
+import fetch from 'node-fetch';
 
 const router = express.Router();
 
@@ -270,7 +271,8 @@ router.post('/', [
   body('type').isIn(['income', 'expense', 'capex']).withMessage('Type must be income, expense, or capex'),
   body('date').isISO8601().withMessage('Date must be a valid date'),
   body('category_id').optional().isInt().withMessage('Category ID must be a number'),
-  body('source').optional().isString().withMessage('Source must be a string')
+  body('source').optional().isString().withMessage('Source must be a string'),
+  body('currency').optional().isString().isLength({ min: 3, max: 3 }).withMessage('Currency must be a 3-letter code')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -278,7 +280,7 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { description, amount, type, category_id, date, source = 'Manual Entry' } = req.body;
+    const { description, amount, type, category_id, date, source = 'Manual Entry', currency } = req.body;
 
     // Verify category exists if provided
     if (category_id) {
@@ -288,10 +290,49 @@ router.post('/', [
       }
     }
 
+    // Get user's base currency
+    const settings = await getRow('SELECT base_currency FROM user_settings WHERE user_id = ?', [req.user.userId]);
+    const baseCurrency = (settings?.base_currency || 'USD').toUpperCase();
+    const transactionCurrency = (currency || baseCurrency).toUpperCase();
+    
+    let baseAmount = amount;
+    let title = description;
+    let originalAmount = null;
+    let originalCurrency = null;
+    let exchangeRate = null;
+    
+    // Handle currency conversion if needed
+    if (transactionCurrency !== baseCurrency) {
+      try {
+        // Try to get exchange rate from our enhanced API
+        const rateData = await fetchExchangeRateAPI(transactionCurrency, baseCurrency);
+        if (rateData && rateData.rate) {
+          exchangeRate = rateData.rate;
+          baseAmount = parseFloat((amount * exchangeRate).toFixed(2));
+          originalAmount = amount;
+          originalCurrency = transactionCurrency;
+          title = `${description} (${transactionCurrency} ${parseFloat(amount).toFixed(2)})`;
+        } else {
+          // Fallback to other APIs
+          const fallbackRate = await fetchFallbackRate(transactionCurrency, baseCurrency);
+          if (fallbackRate && fallbackRate.rate) {
+            exchangeRate = fallbackRate.rate;
+            baseAmount = parseFloat((amount * exchangeRate).toFixed(2));
+            originalAmount = amount;
+            originalCurrency = transactionCurrency;
+            title = `${description} (${transactionCurrency} ${parseFloat(amount).toFixed(2)})`;
+          }
+        }
+      } catch (error) {
+        console.error('Currency conversion error:', error);
+        // If conversion fails, use original amount and currency
+      }
+    }
+
     const result = await runQuery(`
-      INSERT INTO transactions (description, amount, type, category_id, user_id, date, source)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [description, amount, type, category_id, req.user.userId, date, source]);
+      INSERT INTO transactions (description, amount, type, category_id, user_id, date, source, currency, original_amount, original_currency, exchange_rate)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [title, baseAmount, type, category_id, req.user.userId, date, source, baseCurrency, originalAmount, originalCurrency, exchangeRate]);
 
     const transaction = await getRow(`
       SELECT 
@@ -313,6 +354,48 @@ router.post('/', [
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+async function fetchExchangeRateAPI(from, to) {
+  try {
+    const url = `https://api.exchangerate-api.com/v4/latest/${encodeURIComponent(from)}`;
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SpendingTrackerBot/1.0)'
+      }
+    });
+    
+    if (resp.ok) {
+      const data = await resp.json();
+      const rate = data?.rates?.[to];
+      
+      if (typeof rate === 'number') {
+        return {
+          rate: rate,
+          source: 'ExchangeRate-API'
+        };
+      }
+    }
+  } catch (error) {
+    console.error('ExchangeRate-API error:', error);
+  }
+  return null;
+}
+
+async function fetchFallbackRate(from, to) {
+  try {
+    const url = `https://api.exchangerate.host/convert?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const result = data?.result;
+    return typeof result === 'number' ? {
+      rate: result,
+      source: 'ExchangeRate.host'
+    } : null;
+  } catch {
+    return null;
+  }
+}
 
 // Update transaction
 router.put('/:id', [

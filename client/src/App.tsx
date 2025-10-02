@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Analytics from "./pages/Analytics";
 import Categories from "./pages/Categories";
+import Settings from "./pages/Settings";
 import Import from "./pages/Import";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -34,6 +35,7 @@ const App = () => (
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/categories" element={<Categories />} />
+                    <Route path="/settings" element={<Settings />} />
                     <Route path="/import" element={<Import />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>

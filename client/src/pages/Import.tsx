@@ -916,6 +916,7 @@ export default function Import() {
                         result.data.transactionType === 'capex' ? 'text-blue-600' :
                         'text-red-600'
                       }>
+                        {/* Amount will be displayed with proper currency symbol after settings are loaded */}
                         ${result.data.amount?.toFixed(2) || '0.00'}
                       </TableCell>
                       <TableCell>

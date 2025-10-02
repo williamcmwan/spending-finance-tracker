@@ -66,9 +66,23 @@ export function initializeDatabase() {
       user_id INTEGER NOT NULL,
       date DATE NOT NULL,
       source TEXT DEFAULT 'Manual Entry',
+      currency TEXT DEFAULT 'USD',
+      original_amount DECIMAL(10,2),
+      original_currency TEXT,
+      exchange_rate DECIMAL(10,6),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories (id),
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    );
+
+    -- User settings table
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id INTEGER PRIMARY KEY,
+      base_currency TEXT DEFAULT 'USD',
+      extra_currencies TEXT DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users (id)
     );
 
@@ -86,9 +100,10 @@ export function initializeDatabase() {
     } else {
       console.log('Database tables initialized successfully');
       ensureUserTableColumns()
+        .then(() => ensureTransactionTableColumns())
         .then(() => seedDefaultData())
         .catch((e) => {
-          console.error('Error ensuring user columns:', e.message);
+          console.error('Error ensuring table columns:', e.message);
           seedDefaultData();
         });
     }
@@ -121,6 +136,48 @@ async function ensureUserTableColumns() {
   if (!hasTotpEnabled) {
     await new Promise((resolve, reject) => {
       db.run('ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0;', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+}
+
+async function ensureTransactionTableColumns() {
+  const hasCurrency = await columnExists('transactions', 'currency');
+  if (!hasCurrency) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE transactions ADD COLUMN currency TEXT DEFAULT "USD";', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  const hasOriginalAmount = await columnExists('transactions', 'original_amount');
+  if (!hasOriginalAmount) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE transactions ADD COLUMN original_amount DECIMAL(10,2);', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  const hasOriginalCurrency = await columnExists('transactions', 'original_currency');
+  if (!hasOriginalCurrency) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE transactions ADD COLUMN original_currency TEXT;', [], function(err) {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  const hasExchangeRate = await columnExists('transactions', 'exchange_rate');
+  if (!hasExchangeRate) {
+    await new Promise((resolve, reject) => {
+      db.run('ALTER TABLE transactions ADD COLUMN exchange_rate DECIMAL(10,6);', [], function(err) {
         if (err) return reject(err);
         resolve();
       });

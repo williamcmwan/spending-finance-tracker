@@ -15,6 +15,7 @@ import { authRoutes } from './routes/auth.js';
 import { transactionRoutes } from './routes/transactions.js';
 import { categoryRoutes } from './routes/categories.js';
 import { analyticsRoutes } from './routes/analytics.js';
+import { settingsRoutes } from './routes/settings.js';
 import { importRoutes } from './routes/import.js';
 
 // Load environment variables
@@ -111,6 +112,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

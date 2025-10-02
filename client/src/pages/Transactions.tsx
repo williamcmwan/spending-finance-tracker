@@ -133,6 +133,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiClient } from "@/integrations/api/client";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrencySymbol, formatAmountWithCurrency } from "@/utils/currency";
 
 interface Transaction {
   id: number;
@@ -145,6 +146,10 @@ interface Transaction {
   category_icon?: string;
   date: string;
   source?: string;
+  currency?: string;
+  original_amount?: number;
+  original_currency?: string;
+  exchange_rate?: number;
   created_at: string;
   updated_at: string;
 }
@@ -170,6 +175,7 @@ interface TransactionFormData {
   category_id?: number;
   date: string;
   source: string;
+  currency?: string;
 }
 
 interface FilterData {
@@ -211,20 +217,50 @@ export default function Transactions() {
     type: 'expense',
     category_id: undefined,
     date: new Date().toISOString().split('T')[0],
-    source: 'Manual Entry'
+    source: 'Manual Entry',
+    currency: undefined
   });
   const [filterData, setFilterData] = useState<FilterData>({});
   const [activeFilters, setActiveFilters] = useState<FilterData>({});
   const [sortField, setSortField] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [submitting, setSubmitting] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState<string>('USD');
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>(['USD']);
   
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const recordLimitOptions = [10, 20, 50, 100, 200, 500];
 
+  const fetchUserSettings = async () => {
+    try {
+      const settings = await apiClient.getSettings();
+      const baseCurr = settings.base_currency || 'USD';
+      const extraCurr = settings.extra_currencies || [];
+      
+      setBaseCurrency(baseCurr);
+      
+      // Create list of available currencies: base currency + extra currencies
+      const currencies = [baseCurr, ...extraCurr].filter((curr, index, arr) => 
+        arr.indexOf(curr) === index // Remove duplicates
+      );
+      setAvailableCurrencies(currencies);
+      
+      // Update form data with base currency as default
+      setFormData(prev => ({
+        ...prev,
+        currency: baseCurr
+      }));
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+      setBaseCurrency('USD');
+      setAvailableCurrencies(['USD']);
+    }
+  };
+
   useEffect(() => {
+    fetchUserSettings();
     fetchTransactions();
     fetchCategories();
   }, [pagination.page, pagination.limit]);
@@ -395,7 +431,8 @@ export default function Transactions() {
       type: 'expense',
       category_id: undefined,
       date: new Date().toISOString().split('T')[0],
-      source: 'Manual Entry'
+      source: 'Manual Entry',
+      currency: baseCurrency
     });
     setIsAddDialogOpen(true);
   };
@@ -408,7 +445,8 @@ export default function Transactions() {
       type: transaction.type,
       category_id: transaction.category_id,
       date: transaction.date,
-      source: transaction.source || 'Manual Entry'
+      source: transaction.source || 'Manual Entry',
+      currency: (transaction as any).currency || baseCurrency
     });
     setIsEditDialogOpen(true);
   };
@@ -793,7 +831,8 @@ export default function Transactions() {
         type: formData.type,
         category_id: formData.category_id,
         date: formData.date,
-        source: formData.source
+        source: formData.source,
+        currency: formData.currency
       });
       
       toast({
@@ -873,15 +912,14 @@ export default function Transactions() {
       type: 'expense',
       category_id: undefined,
       date: new Date().toISOString().split('T')[0],
-      source: 'Manual Entry'
+      source: 'Manual Entry',
+      currency: baseCurrency
     });
     setEditingTransaction(null);
   };
 
   const formatAmount = (amount: number, type: 'income' | 'expense' | 'capex') => {
-    const isPositive = type === 'income';
-    const formatted = Math.abs(amount).toFixed(2);
-    return isPositive ? `+$${formatted}` : `-$${formatted}`;
+    return formatAmountWithCurrency(amount, baseCurrency, type);
   };
 
   const getAmountColor = (type: 'income' | 'expense' | 'capex') => {
@@ -1094,6 +1132,18 @@ export default function Transactions() {
             <p className="text-muted-foreground">
               Manage all your income and expense transactions
             </p>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="currency" className="text-right">
+              Currency
+            </Label>
+            <Input
+              id="currency"
+              value={formData.currency || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value.toUpperCase() || undefined }))}
+              className="col-span-3"
+              placeholder="Defaults to base (e.g., leave empty for USD)"
+            />
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
@@ -1421,7 +1471,7 @@ export default function Transactions() {
                           {transaction.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className={`text-right font-medium text-sm py-2 ${getAmountColor(transaction.type)}`}>
+                      <TableCell className={`text-right font-medium text-sm py-2 whitespace-nowrap ${getAmountColor(transaction.type)}`}>
                         {formatAmount(transaction.amount, transaction.type)}
                       </TableCell>
                       <TableCell className="py-2">
@@ -1490,6 +1540,24 @@ export default function Transactions() {
                 className="col-span-3"
                 placeholder="Enter transaction description"
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="currency" className="text-right">
+                Currency
+              </Label>
+              <Select value={formData.currency || baseCurrency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCurrencies.map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency} ({getCurrencySymbol(currency)})
+                      {currency === baseCurrency && ' - Base'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">
@@ -1600,6 +1668,24 @@ export default function Transactions() {
                 className="col-span-3"
                 placeholder="Enter transaction description"
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-currency" className="text-right">
+                Currency
+              </Label>
+              <Select value={formData.currency || baseCurrency} onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCurrencies.map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency} ({getCurrencySymbol(currency)})
+                      {currency === baseCurrency && ' - Base'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-amount" className="text-right">

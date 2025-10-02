@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getCurrencySymbol, formatAmountWithCurrency } from "@/utils/currency";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -212,13 +213,14 @@ export default function Dashboard() {
   const [chartCategories, setChartCategories] = useState<ChartCategoryData[]>([]);
   const [selectedCategoryCount, setSelectedCategoryCount] = useState<string>("5");
   const [currentMonthPage, setCurrentMonthPage] = useState(0);
+  const [baseCurrency, setBaseCurrency] = useState<string>('USD');
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastTransactionRef = useRef<HTMLTableRowElement | null>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: baseCurrency
     }).format(amount);
   };
 
@@ -263,9 +265,7 @@ export default function Dashboard() {
   };
 
   const formatAmount = (amount: number, type: 'income' | 'expense' | 'capex') => {
-    const isPositive = type === 'income';
-    const formatted = Math.abs(amount).toFixed(2);
-    return isPositive ? `+$${formatted}` : `-$${formatted}`;
+    return formatAmountWithCurrency(amount, baseCurrency, type);
   };
 
   const getAmountColor = (type: 'income' | 'expense' | 'capex') => {
@@ -407,6 +407,16 @@ export default function Dashboard() {
       start: format(range.from, 'yyyy-MM-dd'),
       end: format(range.to, 'yyyy-MM-dd')
     };
+  };
+
+  const fetchUserSettings = async () => {
+    try {
+      const settings = await apiClient.getSettings();
+      setBaseCurrency(settings.base_currency || 'USD');
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+      setBaseCurrency('USD'); // fallback
+    }
   };
 
   const fetchSummaryData = async (range: { from: Date; to: Date }) => {
@@ -814,6 +824,11 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    // Load user settings on component mount
+    fetchUserSettings();
+  }, []);
+
+  useEffect(() => {
     // Reset pagination when date range changes
     setTransactionPage(1);
     setAllTransactions([]);
@@ -1083,7 +1098,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{item.amount}</div>
+              <div className="text-2xl font-bold whitespace-nowrap">{item.amount}</div>
               <p className="text-xs text-muted-foreground">
                 {dateRange.from && dateRange.to ? (
                   `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
@@ -1148,10 +1163,10 @@ export default function Dashboard() {
                   />
                   <YAxis 
                     tick={{ fontSize: 14, fontFamily: 'inherit' }}
-                    tickFormatter={(value) => `$${value.toLocaleString()}`}
+                    tickFormatter={(value) => `${getCurrencySymbol(baseCurrency)}${value.toLocaleString()}`}
                   />
                   <Tooltip 
-                    formatter={(value: number, name: string) => [`$${value.toFixed(2)}`, name]}
+                    formatter={(value: number, name: string) => [`${getCurrencySymbol(baseCurrency)}${value.toFixed(2)}`, name]}
                     labelFormatter={(label) => `Month: ${label}`}
                     contentStyle={{ 
                       fontSize: '14px', 
@@ -1175,7 +1190,7 @@ export default function Dashboard() {
                       dataKey={category.name}
                       stackId="spending"
                       fill={category.color}
-                      name={`${category.name} ($${category.total.toFixed(0)})`}
+                      name={`${category.name} (${getCurrencySymbol(baseCurrency)}${category.total.toFixed(0)})`}
                     />
                   ))}
                 </BarChart>
@@ -1281,8 +1296,8 @@ export default function Dashboard() {
                           <TableCell key={month} className="px-1 py-2 text-right">
                             {data && data.amount > 0 ? (
                               <div className="relative group inline-block">
-                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer">
-                                  ${data.amount.toFixed(0)}
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer whitespace-nowrap">
+                                  {getCurrencySymbol(baseCurrency)}{data.amount.toFixed(0)}
                                 </span>
                                 {data.change_direction && data.change_percentage !== undefined && (
                                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[1000]">
@@ -1332,8 +1347,8 @@ export default function Dashboard() {
                       
                       return (
                         <TableCell key={month} className="px-1 py-2 text-right font-bold">
-                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                            ${monthTotal.toFixed(0)}
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                            {getCurrencySymbol(baseCurrency)}{monthTotal.toFixed(0)}
                           </span>
                         </TableCell>
                       );
@@ -1436,7 +1451,7 @@ export default function Dashboard() {
                             {transaction.type}
                           </Badge>
                         </TableCell>
-                        <TableCell className={`text-right font-medium text-sm py-2 ${getAmountColor(transaction.type)}`}>
+                        <TableCell className={`text-right font-medium text-sm py-2 whitespace-nowrap ${getAmountColor(transaction.type)}`}>
                           {formatAmount(transaction.amount, transaction.type)}
                         </TableCell>
                       </TableRow>

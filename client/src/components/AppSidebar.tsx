@@ -36,6 +36,7 @@ const menuItems = [
   { title: "Transactions", url: "/transactions", icon: CreditCard },
   { title: "Import", url: "/import", icon: Upload },
   { title: "Categories", url: "/categories", icon: Settings },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

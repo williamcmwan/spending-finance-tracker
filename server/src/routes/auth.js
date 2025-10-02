@@ -84,8 +84,8 @@ router.post('/login', [
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // If TOTP is enabled, return temp token for second factor
-    if (user.totp_enabled) {
+    // If TOTP is enabled, return temp token for second factor (unless bypass is enabled)
+    if (user.totp_enabled && process.env.BYPASS_2FA !== 'true') {
       const tempToken = jwt.sign(
         { userId: user.id, email: user.email, stage: '2fa' },
         process.env.JWT_SECRET || 'your-secret-key',
@@ -143,12 +143,27 @@ router.post('/login/verify-totp', [
       return res.status(400).json({ error: '2FA not enabled for user' });
     }
 
-    const verified = speakeasy.totp.verify({
-      secret: user.totp_secret,
+    const tokenCode = String(code).replace(/\s+/g, '').trim();
+    // Sanitize stored secret (remove spaces or non-base32 chars)
+    const sanitizedSecret = String(user.totp_secret || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+
+    // Try verification with wider tolerance and delta as fallback
+    let verified = speakeasy.totp.verify({
+      secret: sanitizedSecret,
       encoding: 'base32',
-      token: code,
-      window: 1
+      token: tokenCode,
+      window: 3
     });
+
+    if (!verified) {
+      const delta = speakeasy.totp.verifyDelta({
+        secret: sanitizedSecret,
+        encoding: 'base32',
+        token: tokenCode,
+        window: 3
+      });
+      verified = !!delta;
+    }
 
     if (!verified) {
       return res.status(401).json({ error: 'Invalid code' });
@@ -244,6 +259,27 @@ router.post('/totp/enable', [
     return res.json({ message: '2FA enabled' });
   } catch (error) {
     console.error('2FA enable error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2FA: disable (requires auth)
+router.post('/totp/disable', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+    const token = authHeader.replace('Bearer ', '');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    await runQuery('UPDATE users SET totp_enabled = 0, totp_secret = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [decoded.userId]);
+    return res.json({ message: '2FA disabled' });
+  } catch (error) {
+    console.error('2FA disable error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

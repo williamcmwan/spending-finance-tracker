@@ -129,6 +129,22 @@ class ApiClient {
     });
   }
 
+  // Settings
+  async getSettings() {
+    return this.request('/settings');
+  }
+
+  async updateSettings(settings) {
+    return this.request('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  }
+
+  async getRates() {
+    return this.request('/settings/rates');
+  }
+
   async updateTransaction(id, transactionData) {
     return this.request(`/transactions/${id}`, {
       method: 'PUT',

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getCurrencySymbol, formatAmountWithCurrency } from "@/utils/currency";
+import { apiClient } from "@/integrations/api/client";
 import { 
   PieChart,
   BarChart3,
@@ -58,6 +60,21 @@ export default function Analytics() {
   const [chartType, setChartType] = useState<"pie" | "bar">("pie");
   const [timeRange, setTimeRange] = useState("current_month");
   const [compareMode, setCompareMode] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState<string>('USD');
+
+  const fetchUserSettings = async () => {
+    try {
+      const settings = await apiClient.getSettings();
+      setBaseCurrency(settings.base_currency || 'USD');
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+      setBaseCurrency('USD');
+    }
+  };
+
+  useEffect(() => {
+    fetchUserSettings();
+  }, []);
 
   const totalSpending = spendingByCategory.reduce((sum, item) => sum + item.value, 0);
 
@@ -67,8 +84,8 @@ export default function Analytics() {
       return (
         <div className="bg-background border rounded-lg p-3 shadow-lg">
           <p className="font-medium">{data.payload.name}</p>
-          <p className="text-sm text-muted-foreground">
-            ${data.value.toFixed(2)} ({((data.value / totalSpending) * 100).toFixed(1)}%)
+          <p className="text-sm text-muted-foreground whitespace-nowrap">
+            {getCurrencySymbol(baseCurrency)}{data.value.toFixed(2)} ({((data.value / totalSpending) * 100).toFixed(1)}%)
           </p>
         </div>
       );
@@ -121,7 +138,7 @@ export default function Analytics() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Spending</p>
-                <p className="text-2xl font-bold">${totalSpending.toFixed(2)}</p>
+                <p className="text-2xl font-bold whitespace-nowrap">{getCurrencySymbol(baseCurrency)}{totalSpending.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -150,7 +167,7 @@ export default function Analytics() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg per Day</p>
-                <p className="text-2xl font-bold">${(totalSpending / 28).toFixed(2)}</p>
+                <p className="text-2xl font-bold whitespace-nowrap">{getCurrencySymbol(baseCurrency)}{(totalSpending / 28).toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -240,7 +257,7 @@ export default function Analytics() {
                     <span className="font-medium">{category.name}</span>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${category.value.toFixed(2)}</p>
+                    <p className="font-medium whitespace-nowrap">{getCurrencySymbol(baseCurrency)}{category.value.toFixed(2)}</p>
                     <p className="text-sm text-muted-foreground">
                       {((category.value / totalSpending) * 100).toFixed(1)}%
                     </p>
