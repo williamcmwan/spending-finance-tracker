@@ -1059,8 +1059,9 @@ export default function Transactions() {
         size="sm"
         onClick={() => handlePageChange(1)}
         disabled={page === 1}
+        className="h-7 w-7 md:h-8 md:w-8 p-0"
       >
-        <ChevronsLeft className="w-4 h-4" />
+        <ChevronsLeft className="w-3 h-3 md:w-4 md:h-4" />
       </Button>
     );
 
@@ -1072,12 +1073,13 @@ export default function Transactions() {
         size="sm"
         onClick={() => handlePageChange(page - 1)}
         disabled={page === 1}
+        className="h-7 w-7 md:h-8 md:w-8 p-0"
       >
-        <ChevronLeft className="w-4 h-4" />
+        <ChevronLeft className="w-3 h-3 md:w-4 md:h-4" />
       </Button>
     );
 
-    // Page numbers
+    // Page numbers - show fewer on mobile
     const startPage = Math.max(1, page - 2);
     const endPage = Math.min(pages, page + 2);
 
@@ -1088,11 +1090,19 @@ export default function Transactions() {
           variant={i === page ? "default" : "outline"}
           size="sm"
           onClick={() => handlePageChange(i)}
+          className="h-7 w-7 md:h-8 md:w-8 p-0 text-xs md:text-sm hidden sm:inline-flex"
         >
           {i}
         </Button>
       );
     }
+
+    // Current page indicator for mobile
+    buttons.push(
+      <div key="current" className="sm:hidden px-2 text-xs text-muted-foreground">
+        {page} / {pages}
+      </div>
+    );
 
     // Next page button
     buttons.push(
@@ -1102,8 +1112,9 @@ export default function Transactions() {
         size="sm"
         onClick={() => handlePageChange(page + 1)}
         disabled={page === pages}
+        className="h-7 w-7 md:h-8 md:w-8 p-0"
       >
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight className="w-3 h-3 md:w-4 md:h-4" />
       </Button>
     );
 
@@ -1115,8 +1126,9 @@ export default function Transactions() {
         size="sm"
         onClick={() => handlePageChange(pages)}
         disabled={page === pages}
+        className="h-7 w-7 md:h-8 md:w-8 p-0"
       >
-        <ChevronsRight className="w-4 h-4" />
+        <ChevronsRight className="w-3 h-3 md:w-4 md:h-4" />
       </Button>
     );
 
@@ -1126,28 +1138,16 @@ export default function Transactions() {
   if (loading && transactions.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Transactions</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Transactions</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Manage all your income and expense transactions
             </p>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="currency" className="text-right">
-              Currency
-            </Label>
-            <Input
-              id="currency"
-              value={formData.currency || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value.toUpperCase() || undefined }))}
-              className="col-span-3"
-              placeholder="Defaults to base (e.g., leave empty for USD)"
-            />
-          </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin" />
+          <Loader2 className="w-6 h-6 md:w-8 md:h-8 animate-spin" />
         </div>
       </div>
     );
@@ -1156,22 +1156,24 @@ export default function Transactions() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Transactions</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold">Transactions</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Manage all your income and expense transactions
           </p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <Button size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
+
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <Button size="sm" onClick={handleExport} className="text-xs md:text-sm">
+            <Download className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
+            <span className="hidden md:inline ml-2">Export CSV</span>
+            <span className="md:hidden ml-1">Export</span>
           </Button>
-          <Button size="sm" onClick={openAddDialog}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Transaction
+          <Button size="sm" onClick={openAddDialog} className="text-xs md:text-sm">
+            <Plus className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
+            <span className="hidden md:inline ml-2">Add Transaction</span>
+            <span className="md:hidden ml-1">Add</span>
           </Button>
 
         </div>
@@ -1179,58 +1181,63 @@ export default function Transactions() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input 
+        <CardContent className="p-3 md:pt-6 md:px-6 md:pb-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3 h-3 md:w-4 md:h-4" />
+              <Input
                 ref={searchInputRef}
-                placeholder="Search by description, amount, date, or category..." 
+                placeholder="Search by description, amount, date, or category..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10" 
+                className="pl-8 md:pl-10 text-xs md:text-sm h-8 md:h-10"
               />
             </div>
-            <Button 
-              variant={getActiveFilterCount() > 0 ? "default" : "outline"} 
-              size="sm" 
-              onClick={openFilterDialog}
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
-              {getActiveFilterCount() > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {getActiveFilterCount()}
-                </Badge>
-              )}
-            </Button>
-            {getActiveFilterCount() > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleClearFilters}
+            <div className="flex items-center gap-2">
+              <Button
+                variant={getActiveFilterCount() > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={openFilterDialog}
+                className="text-xs md:text-sm h-8 md:h-9"
               >
-                <X className="w-4 h-4" />
+                <Filter className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
+                <span className="ml-1 md:ml-0">Filter</span>
+                {getActiveFilterCount() > 0 && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {getActiveFilterCount()}
+                  </Badge>
+                )}
               </Button>
-            )}
+              {getActiveFilterCount() > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="h-8 md:h-9 px-2"
+                >
+                  <X className="w-3 h-3 md:w-4 md:h-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Transactions Table */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>
-              All Transactions ({pagination.total.toLocaleString()})
+        <CardHeader className="p-3 md:p-6">
+          <div className="flex flex-col gap-2 md:gap-3 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="text-sm md:text-lg">
+              <span className="hidden md:inline">All Transactions ({pagination.total.toLocaleString()})</span>
+              <span className="md:hidden">Transactions ({pagination.total.toLocaleString()})</span>
             </CardTitle>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Show:</span>
-              <Select 
-                value={pagination.limit.toString()} 
+              <span className="text-xs md:text-sm text-muted-foreground">Show:</span>
+              <Select
+                value={pagination.limit.toString()}
                 onValueChange={(value) => handleLimitChange(parseInt(value))}
               >
-                <SelectTrigger className="w-20">
+                <SelectTrigger className="w-16 md:w-20 h-8 md:h-10 text-xs md:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1244,75 +1251,76 @@ export default function Transactions() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
           ) : transactions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-muted-foreground text-xs md:text-sm">
               {searchQuery ? 'No transactions found matching your search.' : 'No transactions yet. Add your first transaction to get started!'}
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow className="h-10">
-                    <TableHead 
-                      className="w-20 cursor-pointer hover:bg-muted/50" 
-                      onClick={() => handleSort('date')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Date {getSortIcon('date')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50" 
-                      onClick={() => handleSort('description')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Description {getSortIcon('description')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="w-32 cursor-pointer hover:bg-muted/50" 
-                      onClick={() => handleSort('category')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Category {getSortIcon('category')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="w-24 cursor-pointer hover:bg-muted/50" 
-                      onClick={() => handleSort('source')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Source {getSortIcon('source')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="w-20 cursor-pointer hover:bg-muted/50" 
-                      onClick={() => handleSort('type')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Type {getSortIcon('type')}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="w-24 text-right cursor-pointer hover:bg-muted/50" 
-                      onClick={() => handleSort('amount')}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        Amount {getSortIcon('amount')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="h-10">
+                      <TableHead
+                        className="w-12 md:w-20 text-xs md:text-sm px-1 md:px-4 cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleSort('date')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Date {getSortIcon('date')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="text-xs md:text-sm px-2 md:px-4 cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleSort('description')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Description {getSortIcon('description')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="w-20 md:w-32 text-xs md:text-sm px-1 md:px-4 hidden sm:table-cell cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleSort('category')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Category {getSortIcon('category')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="w-20 md:w-24 text-xs md:text-sm px-1 md:px-4 hidden lg:table-cell cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleSort('source')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Source {getSortIcon('source')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="w-14 md:w-20 text-xs md:text-sm px-1 md:px-4 hidden md:table-cell cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleSort('type')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Type {getSortIcon('type')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="w-20 md:w-24 text-right text-xs md:text-sm px-1 md:px-4 cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleSort('amount')}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Amount {getSortIcon('amount')}
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-8 md:w-12 px-1 md:px-4"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {transactions.map((transaction) => (
-                                          <TableRow key={transaction.id} className="min-h-12">
-                      <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
+                    <TableRow key={transaction.id} className="min-h-12">
+                      <TableCell className="text-muted-foreground text-xs md:text-sm py-2 px-1 md:px-4 whitespace-nowrap align-top">
                         {inlineEditingDate === transaction.id ? (
                           <Input
                             type="date"
@@ -1327,26 +1335,27 @@ export default function Transactions() {
                                 setInlineEditValues({});
                               }
                             }}
-                            className="h-8 text-sm"
+                            className="h-7 md:h-8 text-xs md:text-sm"
                             autoFocus
                           />
                         ) : (
-                          <div 
+                          <div
                             className="cursor-pointer hover:bg-muted/50 px-1 py-1 rounded"
                             onClick={() => {
                               setInlineEditingDate(transaction.id);
                               setInlineEditValues({ date: transaction.date });
                             }}
                           >
-                            {transaction.date}
+                            <div className="hidden md:block">{transaction.date}</div>
+                            <div className="md:hidden text-xs">{transaction.date.slice(5)}</div>
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="py-2">
+                      <TableCell className="py-2 px-2 md:px-4 align-top">
                         {inlineEditingDescription === transaction.id ? (
                           <div className="flex items-start gap-2">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5" 
+                            <div
+                              className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full flex-shrink-0 mt-1.5"
                               style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
                             />
                             <Input
@@ -1361,32 +1370,40 @@ export default function Transactions() {
                                   setInlineEditValues({});
                                 }
                               }}
-                              className="text-sm"
+                              className="text-xs md:text-sm"
                               autoFocus
                             />
                           </div>
                         ) : (
-                          <div className="flex items-start gap-2">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" 
-                              style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
-                            />
-                            <div 
-                              className="font-medium text-sm break-words leading-relaxed cursor-pointer hover:bg-muted/50 px-1 py-1 rounded flex-1"
-                              onClick={() => {
-                                setInlineEditingDescription(transaction.id);
-                                setInlineEditValues({ description: transaction.description });
-                              }}
-                            >
-                              {transaction.description}
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-start gap-1.5">
+                              <div
+                                className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full flex-shrink-0 mt-1"
+                                style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
+                              />
+                              <div
+                                className="font-medium text-xs md:text-sm break-words leading-tight flex-1 cursor-pointer hover:bg-muted/50 px-1 py-1 rounded"
+                                onClick={() => {
+                                  setInlineEditingDescription(transaction.id);
+                                  setInlineEditValues({ description: transaction.description });
+                                }}
+                              >
+                                {transaction.description}
+                              </div>
+                            </div>
+                            <div className="sm:hidden flex items-center gap-2 ml-3 text-xs">
+                              <span className="text-muted-foreground truncate">{transaction.category_name}</span>
+                              <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-1.5 py-0">
+                                {transaction.type}
+                              </Badge>
                             </div>
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="py-2">
+                      <TableCell className="py-2 px-1 md:px-4 hidden sm:table-cell align-top">
                         {inlineEditingCategory === transaction.id ? (
-                          <Select 
-                            value={transaction.category_id?.toString() || 'none'} 
+                          <Select
+                            value={transaction.category_id?.toString() || 'none'}
                             onValueChange={(value) => handleInlineCategoryChange(transaction.id, value === 'none' ? undefined : parseInt(value))}
                             onOpenChange={(open) => !open && setInlineEditingCategory(null)}
                           >
@@ -1409,27 +1426,27 @@ export default function Transactions() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <div 
-                            className="flex items-center gap-1.5 cursor-pointer hover:bg-muted/50 px-2 py-1 rounded text-xs"
+                          <div
+                            className="flex items-center gap-1 cursor-pointer hover:bg-muted/50 px-1 py-1 rounded text-xs"
                             onClick={() => setInlineEditingCategory(transaction.id)}
                           >
                             {transaction.category_icon ? (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1">
                                 {(() => {
                                   const IconComponent = getCategoryIcon(transaction.category_icon);
-                                  return <IconComponent className="w-3 h-3 flex-shrink-0" style={{ color: getCategoryColor(transaction.category_color) }} />;
+                                  return <IconComponent className="w-2.5 h-2.5 md:w-3 md:h-3" style={{ color: getCategoryColor(transaction.category_color) }} />;
                                 })()}
-                                <span className="text-xs">
+                                <span className="text-xs truncate max-w-[80px]">
                                   {transaction.category_name || 'Uncategorized'}
                                 </span>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5">
-                                <div 
-                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                              <div className="flex items-center gap-1">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                   style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
                                 />
-                                <span className="text-xs">
+                                <span className="text-xs truncate max-w-[80px]">
                                   {transaction.category_name || 'Uncategorized'}
                                 </span>
                               </div>
@@ -1437,7 +1454,7 @@ export default function Transactions() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="py-2">
+                      <TableCell className="py-2 px-1 md:px-4 hidden lg:table-cell align-top">
                         {inlineEditingSource === transaction.id ? (
                           <Input
                             value={inlineEditValues.source || transaction.source || 'Manual Entry'}
@@ -1451,12 +1468,12 @@ export default function Transactions() {
                                 setInlineEditValues({});
                               }
                             }}
-                            className="h-8 text-sm"
+                            className="h-7 md:h-8 text-xs md:text-sm"
                             autoFocus
                           />
                         ) : (
-                          <div 
-                            className="text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 px-1 py-1 rounded"
+                          <div
+                            className="text-xs md:text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 px-1 py-1 rounded truncate"
                             onClick={() => {
                               setInlineEditingSource(transaction.id);
                               setInlineEditValues({ source: transaction.source || 'Manual Entry' });
@@ -1466,18 +1483,18 @@ export default function Transactions() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="py-2">
+                      <TableCell className="py-2 px-1 md:px-4 hidden md:table-cell align-top">
                         <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-2 py-0.5">
                           {transaction.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className={`text-right font-medium text-sm py-2 whitespace-nowrap ${getAmountColor(transaction.type)}`}>
+                      <TableCell className={`text-right font-medium text-xs md:text-sm py-2 px-1 md:px-4 whitespace-nowrap align-top ${getAmountColor(transaction.type)}`}>
                         {formatAmount(transaction.amount, transaction.type)}
                       </TableCell>
-                      <TableCell className="py-2">
+                      <TableCell className="py-2 px-1 md:px-4 align-top">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 md:h-7 md:w-7">
                               <MoreHorizontal className="w-3 h-3" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -1486,7 +1503,7 @@ export default function Transactions() {
                               <Edit className="w-3 h-3 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDeleteTransaction(transaction.id)}
                             >
@@ -1500,16 +1517,17 @@ export default function Transactions() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Pagination */}
               {pagination.pages > 1 && (
-                <div className="flex items-center justify-between mt-6">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-4 md:mt-6 px-3 md:px-0">
+                  <div className="text-xs md:text-sm text-muted-foreground text-center md:text-left">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                     {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                     {pagination.total.toLocaleString()} results
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-1 md:gap-2">
                     {renderPaginationButtons()}
                   </div>
                 </div>

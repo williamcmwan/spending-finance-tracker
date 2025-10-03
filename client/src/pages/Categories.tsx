@@ -396,38 +396,39 @@ export default function Categories() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col gap-3 md:gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Categories</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Categories</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Manage your transaction categories
             </p>
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-primary"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Categories</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold">Categories</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Manage your transaction categories
           </p>
         </div>
-        
+
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Category
+            <Button size="sm" className="text-xs md:text-sm">
+              <Plus className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
+              <span className="hidden md:inline ml-2">Add Category</span>
+              <span className="md:hidden ml-1">Add</span>
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -523,14 +524,14 @@ export default function Categories() {
 
       {/* Search */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input 
-              placeholder="Search categories..." 
+        <CardContent className="p-3 md:pt-6 md:px-6 md:pb-6">
+          <div className="relative w-full md:max-w-sm">
+            <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3 h-3 md:w-4 md:h-4" />
+            <Input
+              placeholder="Search categories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10" 
+              className="pl-8 md:pl-10 text-xs md:text-sm h-8 md:h-10"
             />
           </div>
         </CardContent>
@@ -538,82 +539,92 @@ export default function Categories() {
 
       {/* Categories Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>All Categories ({filteredCategories.length})</CardTitle>
+        <CardHeader className="p-3 md:p-6">
+          <CardTitle className="text-sm md:text-lg">
+            <span className="hidden md:inline">All Categories ({filteredCategories.length})</span>
+            <span className="md:hidden">Categories ({filteredCategories.length})</span>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead>Icon</TableHead>
-                <TableHead>Color</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[70px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCategories.map((category) => {
-                const IconComponent = getIconComponent(category.icon);
-                return (
-                  <TableRow key={category.id}>
-                    <TableCell>
-                      <span className="font-medium">{category.name}</span>
-                    </TableCell>
-                    <TableCell>
-                      <IconComponent className="w-4 h-4" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded-full" 
-                          style={{ backgroundColor: category.color }}
-                        />
-                        <span className="text-sm text-muted-foreground">{category.color}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {category.is_once_off ? (
-                        <Badge variant="secondary" className="text-xs">
-                          Once-off
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">
-                          Regular
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(category.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(category)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => handleDeleteCategory(category)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <CardContent className="p-0 md:p-6">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs md:text-sm px-2 md:px-4">Category</TableHead>
+                  <TableHead className="text-xs md:text-sm px-1 md:px-4 hidden sm:table-cell">Icon</TableHead>
+                  <TableHead className="text-xs md:text-sm px-1 md:px-4 hidden md:table-cell">Color</TableHead>
+                  <TableHead className="text-xs md:text-sm px-1 md:px-4">Type</TableHead>
+                  <TableHead className="text-xs md:text-sm px-1 md:px-4 hidden lg:table-cell">Created</TableHead>
+                  <TableHead className="w-8 md:w-[70px] px-1 md:px-4"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCategories.map((category) => {
+                  const IconComponent = getIconComponent(category.icon);
+                  return (
+                    <TableRow key={category.id}>
+                      <TableCell className="px-2 md:px-4 py-2 align-top">
+                        <div className="flex items-center gap-1.5">
+                          <div className="sm:hidden">
+                            <IconComponent className="w-3 h-3" style={{ color: category.color }} />
+                          </div>
+                          <span className="font-medium text-xs md:text-sm">{category.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-1 md:px-4 py-2 hidden sm:table-cell align-top">
+                        <IconComponent className="w-3 h-3 md:w-4 md:h-4" style={{ color: category.color }} />
+                      </TableCell>
+                      <TableCell className="px-1 md:px-4 py-2 hidden md:table-cell align-top">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 md:w-4 md:h-4 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <span className="text-xs md:text-sm text-muted-foreground">{category.color}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-1 md:px-4 py-2 align-top">
+                        {category.is_once_off ? (
+                          <Badge variant="secondary" className="text-xs px-1.5 md:px-2 py-0">
+                            Once-off
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs px-1.5 md:px-2 py-0">
+                            Regular
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-1 md:px-4 py-2 text-muted-foreground text-xs md:text-sm hidden lg:table-cell align-top">
+                        {new Date(category.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="px-1 md:px-4 py-2 align-top">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 md:h-8 md:w-8">
+                              <MoreHorizontal className="w-3 h-3 md:w-4 md:h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(category)}>
+                              <Edit className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteCategory(category)}
+                            >
+                              <Trash2 className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

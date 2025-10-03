@@ -231,10 +231,12 @@ export default function Dashboard() {
   // Helper function to get months for current page
   const getCurrentMonths = () => {
     if (monthlyCategorySpending.length === 0) return [];
-    
+
     const allMonths = Object.keys(monthlyCategorySpending[0].monthly_amounts);
-    const startIndex = currentMonthPage * 8;
-    const endIndex = startIndex + 8;
+    const isMobile = window.innerWidth < 768; // md breakpoint
+    const monthsPerPage = isMobile ? 3 : 8;
+    const startIndex = currentMonthPage * monthsPerPage;
+    const endIndex = startIndex + monthsPerPage;
     return allMonths.slice(startIndex, endIndex);
   };
 
@@ -242,7 +244,9 @@ export default function Dashboard() {
   const getTotalMonthPages = () => {
     if (monthlyCategorySpending.length === 0) return 0;
     const allMonths = Object.keys(monthlyCategorySpending[0].monthly_amounts);
-    return Math.ceil(allMonths.length / 8);
+    const isMobile = window.innerWidth < 768; // md breakpoint
+    const monthsPerPage = isMobile ? 3 : 8;
+    return Math.ceil(allMonths.length / monthsPerPage);
   };
 
   // Initialize to last page when data loads
@@ -278,8 +282,43 @@ export default function Dashboard() {
     return "text-red-600";
   };
 
-  const getCategoryColor = (color: string) => {
-    return color || '#6B7280';
+  // Helper function to brighten colors for dark mode
+  const brightenColor = (hex: string, percent: number = 40): string => {
+    // Remove # if present
+    hex = hex.replace('#', '');
+
+    // Convert to RGB
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Brighten by increasing each component toward 255
+    const brighten = (component: number) => {
+      return Math.min(255, Math.round(component + (255 - component) * (percent / 100)));
+    };
+
+    const newR = brighten(r);
+    const newG = brighten(g);
+    const newB = brighten(b);
+
+    // Convert back to hex
+    const toHex = (n: number) => n.toString(16).padStart(2, '0');
+    return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
+  };
+
+  const getCategoryColor = (color: string, brightenForDarkMode: boolean = false) => {
+    const baseColor = color || '#6B7280';
+
+    // If brighten is requested, check if we're in dark mode
+    if (brightenForDarkMode) {
+      // Check if dark mode is active
+      const isDarkMode = document.documentElement.classList.contains('dark');
+      if (isDarkMode) {
+        return brightenColor(baseColor);
+      }
+    }
+
+    return baseColor;
   };
 
   const getCategoryDisplayText = (count: string) => {
@@ -763,7 +802,7 @@ export default function Dashboard() {
           const monthKey = format(new Date(transaction.date), 'MMM yyyy');
           const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
-          const color = getCategoryColor(transaction.category_color);
+          const color = getCategoryColor(transaction.category_color, true);
           
           // Track monthly data
           if (!monthlyData.has(monthKey)) {
@@ -992,52 +1031,55 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header with Month Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Track your income and expenses
           </p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
+
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handlePreviousMonth}
             disabled={loading}
+            className="px-2"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          
-          <div className="relative">
+
+          <div className="relative flex-1 md:flex-none">
             <Popover>
               <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   disabled={loading}
-                  className="min-w-[200px] justify-start text-left font-normal"
+                  className="w-full md:min-w-[200px] justify-start text-left font-normal text-xs md:text-sm"
                 >
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  {dateRange.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd, yyyy")}
-                      </>
+                  <CalendarIcon className="w-4 h-4 mr-1 md:mr-2 flex-shrink-0" />
+                  <span className="truncate">
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd, yyyy")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "MMM dd, yyyy")
+                      )
                     ) : (
-                      format(dateRange.from, "MMM dd, yyyy")
-                    )
-                  ) : (
-                    <span>Pick a date range</span>
-                  )}
+                      <span>Pick a date range</span>
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent 
-                className="w-auto p-3 bg-white border shadow-xl" 
-                align="end" 
+              <PopoverContent
+                className="w-auto p-3 bg-white border shadow-xl"
+                align="center"
                 sideOffset={8}
                 side="bottom"
               >
@@ -1050,31 +1092,46 @@ export default function Dashboard() {
                       setDateRange(range);
                     }
                   }}
+                  numberOfMonths={1}
+                  className="md:hidden"
+                />
+                <Calendar
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={(range: any) => {
+                    if (range?.from && range?.to) {
+                      setDateRange(range);
+                    }
+                  }}
                   numberOfMonths={2}
+                  className="hidden md:block"
                 />
               </PopoverContent>
             </Popover>
           </div>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleNextMonth}
             disabled={loading}
+            className="px-2"
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 disabled={loading}
-                className="ml-2"
+                className="text-xs md:text-sm"
               >
-                Quick Select
-                <ChevronDown className="w-4 h-4 ml-2" />
+                <span className="hidden md:inline">Quick Select</span>
+                <span className="md:hidden">Quick</span>
+                <ChevronDown className="w-4 h-4 ml-1 md:ml-2" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1102,20 +1159,20 @@ export default function Dashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         {summaryCards.map((item, index) => (
           <Card key={index} className="relative overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                 {item.title}
               </CardTitle>
-              <div className={`p-2 rounded-lg ${item.bgColor}`}>
-                <item.icon className={`h-4 w-4 ${item.color}`} />
+              <div className={`p-1.5 md:p-2 rounded-lg ${item.bgColor}`}>
+                <item.icon className={`h-3 w-3 md:h-4 md:w-4 ${item.color}`} />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold whitespace-nowrap">{item.amount}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-3 md:p-6 pt-0">
+              <div className="text-lg md:text-2xl font-bold break-words">{item.amount}</div>
+              <p className="text-xs text-muted-foreground break-words">
                 {dateRange.from && dateRange.to ? (
                   `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
                 ) : (
@@ -1129,13 +1186,14 @@ export default function Dashboard() {
 
       {/* Monthly Spending Chart */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>
-              Monthly Spending Trends (Expenses Only) - {getCategoryDisplayText(selectedCategoryCount)}
+        <CardHeader className="p-3 md:p-6">
+          <div className="flex flex-col gap-2 md:gap-3 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="text-sm md:text-lg">
+              <span className="hidden md:inline">Monthly Spending Trends (Expenses Only) - {getCategoryDisplayText(selectedCategoryCount)}</span>
+              <span className="md:hidden">Spending Trends</span>
             </CardTitle>
             <Select value={selectedCategoryCount} onValueChange={setSelectedCategoryCount}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-full md:w-32 text-xs md:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1148,57 +1206,64 @@ export default function Dashboard() {
             </Select>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Loading chart data...</div>
+              <div className="text-muted-foreground text-sm">Loading chart data...</div>
             </div>
           ) : monthlyChartData.length === 0 ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">No data available for chart</div>
+              <div className="text-muted-foreground text-sm">No data available for chart</div>
             </div>
           ) : (
-            <div className="h-80 w-full">
+            <div className="h-64 md:h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={monthlyChartData}
                   margin={{
                     top: 20,
-                    right: 30,
-                    left: 20,
+                    right: 5,
+                    left: -20,
                     bottom: 5,
                   }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fontSize: 14, fontFamily: 'inherit' }}
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 10, fontFamily: 'inherit', fill: 'currentColor' }}
+                    className="text-gray-700 dark:text-gray-300"
                     angle={-45}
                     textAnchor="end"
                     height={60}
                   />
-                  <YAxis 
-                    tick={{ fontSize: 14, fontFamily: 'inherit' }}
+                  <YAxis
+                    tick={{ fontSize: 10, fontFamily: 'inherit', fill: 'currentColor' }}
+                    className="text-gray-700 dark:text-gray-300"
                     tickFormatter={(value) => `${getCurrencySymbol(baseCurrency)}${value.toLocaleString()}`}
+                    width={45}
                   />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: number, name: string) => [`${getCurrencySymbol(baseCurrency)}${value.toFixed(2)}`, name]}
                     labelFormatter={(label) => `Month: ${label}`}
-                    contentStyle={{ 
-                      fontSize: '14px', 
+                    contentStyle={{
+                      fontSize: '12px',
                       fontFamily: 'inherit',
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                      border: '1px solid #e5e7eb',
+                      backgroundColor: 'hsl(var(--background))',
+                      color: 'hsl(var(--foreground))',
+                      border: '1px solid hsl(var(--border))',
                       borderRadius: '6px',
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                     }}
+                    cursor={{ fill: 'hsl(var(--accent) / 0.2)' }}
                   />
-                  <Legend 
-                    wrapperStyle={{ 
-                      fontSize: '14px', 
+                  <Legend
+                    wrapperStyle={{
+                      fontSize: '10px',
                       fontFamily: 'inherit',
-                      paddingTop: '10px'
+                      paddingTop: '10px',
+                      color: 'hsl(var(--foreground))'
                     }}
+                    iconSize={8}
                   />
                   {chartCategories.map((category, index) => (
                     <Bar
@@ -1218,14 +1283,15 @@ export default function Dashboard() {
 
       {/* Category Spending Analysis */}
       <Card className="overflow-hidden">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>
-              Spending by Category (Expenses Only) - {dateRange.from && dateRange.to ? (
+        <CardHeader className="p-3 md:p-6">
+          <div className="flex flex-col gap-2 md:gap-3 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="text-sm md:text-lg">
+              <span className="hidden md:block">Spending by Category (Expenses Only) - {dateRange.from && dateRange.to ? (
                 `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
               ) : (
                 'Select date range'
-              )}
+              )}</span>
+              <span className="md:hidden">Category Spending</span>
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Switch
@@ -1233,13 +1299,13 @@ export default function Dashboard() {
                 checked={showOnlyRegularCategories}
                 onCheckedChange={setShowOnlyRegularCategories}
               />
-              <Label htmlFor="regular-categories-only" className="text-sm font-normal">
-                Regular categories only
+              <Label htmlFor="regular-categories-only" className="text-xs md:text-sm font-normal">
+                Regular only
               </Label>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4 overflow-hidden">
+        <CardContent className="p-0 md:p-4 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-muted-foreground">Loading category data...</div>
@@ -1251,28 +1317,30 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-4">
               {/* Month Navigation */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={goToPreviousMonths}
                     disabled={currentMonthPage === 0}
+                    className="text-xs md:text-sm"
                   >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
+                    <ChevronLeft className="w-3 h-3 md:w-4 md:h-4" />
+                    <span className="hidden md:inline">Previous</span>
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={goToNextMonths}
                     disabled={currentMonthPage >= getTotalMonthPages() - 1}
+                    className="text-xs md:text-sm"
                   >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
+                    <span className="hidden md:inline">Next</span>
+                    <ChevronRight className="w-3 h-3 md:w-4 md:h-4" />
                   </Button>
                 </div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-xs md:text-sm text-muted-foreground">
                   {getCurrentMonths().length > 0 && (
                     `${getCurrentMonths()[0]} - ${getCurrentMonths()[getCurrentMonths().length - 1]} (Page ${currentMonthPage + 1} of ${getTotalMonthPages()})`
                   )}
@@ -1280,18 +1348,19 @@ export default function Dashboard() {
               </div>
 
               {/* Table */}
-              <Table className="w-full text-sm">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-sm px-2 py-2 w-32">Category</TableHead>
-                    {/* Dynamic month headers - show current 8 months */}
-                    {getCurrentMonths().map(month => (
-                      <TableHead key={month} className="text-right text-sm px-1 py-2">
-                        <div className="truncate" title={month}>
-                          {month}
-                        </div>
-                      </TableHead>
-                    ))}
+              <div className="overflow-x-auto">
+                <Table className="w-full text-xs md:text-sm">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs md:text-sm px-2 py-2 w-20 md:w-32 sticky left-0 bg-background z-10">Category</TableHead>
+                      {/* Dynamic month headers - 3 months on mobile, 8 on desktop */}
+                      {getCurrentMonths().map(month => (
+                        <TableHead key={month} className="text-right text-xs md:text-sm px-1 py-2 min-w-[65px] md:min-w-[90px]">
+                          <div className="truncate" title={month}>
+                            {month}
+                          </div>
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1299,20 +1368,20 @@ export default function Dashboard() {
                   const IconComponent = getCategoryIcon(category.category_icon);
                   return (
                     <TableRow key={category.category_name}>
-                      <TableCell className="px-2 py-2">
-                        <div className="flex items-center gap-2">
+                      <TableCell className="px-2 py-2 sticky left-0 bg-background z-10">
+                        <div className="flex items-center gap-1">
                           {category.category_icon ? (
-                            <IconComponent 
-                              className="w-3 h-3 flex-shrink-0" 
-                              style={{ color: getCategoryColor(category.category_color) }} 
+                            <IconComponent
+                              className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0"
+                              style={{ color: getCategoryColor(category.category_color) }}
                             />
                           ) : (
                             <div
-                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: getCategoryColor(category.category_color) }}
                             />
                           )}
-                          <div className="text-sm font-medium truncate" title={category.category_name}>
+                          <div className="text-xs md:text-sm font-medium truncate" title={category.category_name}>
                             {category.category_name}
                           </div>
                         </div>
@@ -1324,7 +1393,7 @@ export default function Dashboard() {
                           <TableCell key={month} className="px-1 py-2 text-right">
                             {data && data.amount > 0 ? (
                               <div className="relative group inline-block">
-                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer whitespace-nowrap">
+                                <span className="text-xs md:text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer whitespace-nowrap">
                                   {getCurrencySymbol(baseCurrency)}{data.amount.toFixed(0)}
                                 </span>
                                 {data.change_direction && data.change_percentage !== undefined && (
@@ -1336,8 +1405,8 @@ export default function Dashboard() {
                                         <ArrowDown className="w-3 h-3 text-red-400" />
                                       ) : null}
                                       <span className={`${
-                                        data.change_direction === 'up' ? 'text-green-400' : 
-                                        data.change_direction === 'down' ? 'text-red-400' : 
+                                        data.change_direction === 'up' ? 'text-green-400' :
+                                        data.change_direction === 'down' ? 'text-red-400' :
                                         'text-gray-300'
                                       }`}>
                                         {data.change_percentage.toFixed(0)}%
@@ -1349,7 +1418,7 @@ export default function Dashboard() {
                                 )}
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-sm">-</span>
+                              <span className="text-gray-400 text-xs md:text-sm">-</span>
                             )}
                           </TableCell>
                         );
@@ -1360,10 +1429,10 @@ export default function Dashboard() {
                   
                   {/* Total Row */}
                   <TableRow className="border-t-2 border-gray-300 bg-gray-50 dark:bg-gray-800">
-                    <TableCell className="px-2 py-2 font-bold">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-gray-500 rounded-full flex-shrink-0"></div>
-                        <div className="text-sm font-bold">Total Expenses</div>
+                    <TableCell className="px-2 py-2 font-bold sticky left-0 bg-gray-50 dark:bg-gray-800 z-10">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 md:w-3 md:h-3 bg-gray-500 rounded-full flex-shrink-0"></div>
+                        <div className="text-xs md:text-sm font-bold">Total</div>
                       </div>
                     </TableCell>
                     {/* Calculate and display monthly totals */}
@@ -1372,10 +1441,10 @@ export default function Dashboard() {
                         const data = category.monthly_amounts[month];
                         return total + (data?.amount || 0);
                       }, 0);
-                      
+
                       return (
                         <TableCell key={month} className="px-1 py-2 text-right font-bold">
-                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                          <span className="text-xs md:text-sm font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">
                             {getCurrencySymbol(baseCurrency)}{monthTotal.toFixed(0)}
                           </span>
                         </TableCell>
@@ -1384,6 +1453,7 @@ export default function Dashboard() {
                   </TableRow>
                   </TableBody>
                 </Table>
+              </div>
             </div>
           )}
         </CardContent>
@@ -1391,95 +1461,106 @@ export default function Dashboard() {
 
       {/* Transactions for Selected Month */}
       <Card>
-        <CardHeader>
-          <CardTitle>
-          Transactions - {dateRange.from && dateRange.to ? (
-            `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
-          ) : (
-            'Select date range'
-          )} ({totalTransactionCount} transactions)
-        </CardTitle>
+        <CardHeader className="p-3 md:p-6">
+          <CardTitle className="text-sm md:text-lg">
+            <span className="hidden md:inline">Transactions - {dateRange.from && dateRange.to ? (
+              `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`
+            ) : (
+              'Select date range'
+            )} ({totalTransactionCount} transactions)</span>
+            <span className="md:hidden">Transactions ({totalTransactionCount})</span>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Loading summary...</div>
+              <div className="text-muted-foreground text-sm">Loading summary...</div>
             </div>
           ) : allTransactions.length === 0 && !transactionsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">No transactions found for this period</div>
+              <div className="text-muted-foreground text-sm">No transactions found for this period</div>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="h-10">
-                  <TableHead className="w-20">Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="w-32">Category</TableHead>
-                  <TableHead className="w-24">Source</TableHead>
-                  <TableHead className="w-20">Type</TableHead>
-                  <TableHead className="w-24 text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="h-10">
+                    <TableHead className="w-12 md:w-20 text-xs md:text-sm px-1 md:px-4">Date</TableHead>
+                    <TableHead className="text-xs md:text-sm px-2 md:px-4">Description</TableHead>
+                    <TableHead className="w-20 md:w-32 text-xs md:text-sm px-1 md:px-4 hidden sm:table-cell">Category</TableHead>
+                    <TableHead className="w-20 md:w-24 text-xs md:text-sm px-1 md:px-4 hidden lg:table-cell">Source</TableHead>
+                    <TableHead className="w-14 md:w-20 text-xs md:text-sm px-1 md:px-4 hidden md:table-cell">Type</TableHead>
+                    <TableHead className="w-20 md:w-24 text-right text-xs md:text-sm px-1 md:px-4">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {allTransactions.map((transaction, index) => {
                     const isLast = index === allTransactions.length - 1;
                     return (
-                      <TableRow 
-                        key={transaction.id} 
+                      <TableRow
+                        key={transaction.id}
                         className="min-h-12"
                         ref={isLast ? lastTransactionElementRef : null}
                       >
-                        <TableCell className="text-muted-foreground text-sm py-2 whitespace-nowrap">
-                          {transaction.date}
+                        <TableCell className="text-muted-foreground text-xs md:text-sm py-2 px-1 md:px-4 align-top">
+                          <div className="hidden md:block">{transaction.date}</div>
+                          <div className="md:hidden text-xs">{format(new Date(transaction.date), 'MM/dd')}</div>
                         </TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-start gap-2">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" 
-                              style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
-                            />
-                            <div className="font-medium text-sm break-words leading-relaxed flex-1">
-                              {transaction.description}
+                        <TableCell className="py-2 px-2 md:px-4 align-top">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-start gap-1.5">
+                              <div
+                                className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full flex-shrink-0 mt-1"
+                                style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
+                              />
+                              <div className="font-medium text-xs md:text-sm break-words leading-tight flex-1">
+                                {transaction.description}
+                              </div>
+                            </div>
+                            <div className="sm:hidden flex items-center gap-2 ml-3 text-xs">
+                              <span className="text-muted-foreground truncate">{transaction.category_name}</span>
+                              <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-1.5 py-0">
+                                {transaction.type}
+                              </Badge>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-1.5 text-xs">
+                        <TableCell className="py-2 px-1 md:px-4 hidden sm:table-cell align-top">
+                          <div className="flex items-center gap-1 text-xs">
                             {transaction.category_icon ? (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1">
                                 {(() => {
                                   const IconComponent = getCategoryIcon(transaction.category_icon);
-                                  return <IconComponent className="w-3 h-3" style={{ color: getCategoryColor(transaction.category_color) }} />;
+                                  return <IconComponent className="w-2.5 h-2.5 md:w-3 md:h-3" style={{ color: getCategoryColor(transaction.category_color) }} />;
                                 })()}
-                                <span className="text-xs">
+                                <span className="text-xs truncate max-w-[80px]">
                                   {transaction.category_name || 'Uncategorized'}
                                 </span>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5">
-                                <div 
-                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                              <div className="flex items-center gap-1">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                   style={{ backgroundColor: getCategoryColor(transaction.category_color) }}
                                 />
-                                <span className="text-xs">
+                                <span className="text-xs truncate max-w-[80px]">
                                   {transaction.category_name || 'Uncategorized'}
                                 </span>
                               </div>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="py-2">
-                          <div className="text-sm text-muted-foreground">
+                        <TableCell className="py-2 px-1 md:px-4 hidden lg:table-cell align-top">
+                          <div className="text-xs md:text-sm text-muted-foreground truncate">
                             {transaction.source || 'Manual Entry'}
                           </div>
                         </TableCell>
-                        <TableCell className="py-2">
+                        <TableCell className="py-2 px-1 md:px-4 hidden md:table-cell align-top">
                           <Badge variant={transaction.type === 'income' ? 'default' : 'secondary'} className="text-xs px-2 py-0.5">
                             {transaction.type}
                           </Badge>
                         </TableCell>
-                        <TableCell className={`text-right font-medium text-sm py-2 whitespace-nowrap ${getAmountColor(transaction.type)}`}>
+                        <TableCell className={`text-right font-medium text-xs md:text-sm py-2 px-1 md:px-4 whitespace-nowrap align-top ${getAmountColor(transaction.type)}`}>
                           {formatAmount(transaction.amount, transaction.type)}
                         </TableCell>
                       </TableRow>
@@ -1488,12 +1569,13 @@ export default function Dashboard() {
                   {transactionsLoading && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-4">
-                        <div className="text-muted-foreground">Loading more transactions...</div>
+                        <div className="text-muted-foreground text-sm">Loading more transactions...</div>
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
+            </div>
           )}
         </CardContent>
       </Card>
