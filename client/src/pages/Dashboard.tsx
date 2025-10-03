@@ -777,11 +777,12 @@ export default function Dashboard() {
     }
   };
 
-  const fetchMonthlyChartData = async (range: { from: Date; to: Date }) => {
+  const fetchMonthlyChartData = async (range: { from: Date; to: Date }, categoryCount: string = "5") => {
     try {
       const { start, end } = getDateRange(range);
       
       console.log('Fetching monthly chart data for:', start, 'to', end);
+      console.log('showOnlyRegularCategories:', showOnlyRegularCategories);
       
       // Fetch only expense transactions for chart analysis (excluding capex)
       const expenseResponse = await apiClient.request(`/transactions?start_date=${start}&end_date=${end}&type=expense&limit=999999`);
@@ -789,8 +790,9 @@ export default function Dashboard() {
       if (expenseResponse.transactions) {
         const transactions = expenseResponse.transactions || [];
         
-        // Group transactions by month
-        const monthlyData = new Map<string, number>();
+        // Group transactions by month and category
+        const monthlyData = new Map<string, Map<string, { amount: number; color: string }>>();
+        const categoryTotals = new Map<string, { total: number; color: string }>();
         
         transactions.forEach((transaction: Transaction) => {
           // Explicitly exclude capex transactions
@@ -804,34 +806,68 @@ export default function Dashboard() {
           }
           
           const monthKey = format(new Date(transaction.date), 'MMM yyyy');
+          const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
+          const color = getCategoryColor(transaction.category_color, true);
           
-          // Track monthly totals
-          if (monthlyData.has(monthKey)) {
-            monthlyData.set(monthKey, monthlyData.get(monthKey)! + amount);
+          // Track monthly data
+          if (!monthlyData.has(monthKey)) {
+            monthlyData.set(monthKey, new Map());
+          }
+          const monthMap = monthlyData.get(monthKey)!;
+          
+          if (monthMap.has(categoryName)) {
+            monthMap.get(categoryName)!.amount += amount;
           } else {
-            monthlyData.set(monthKey, amount);
+            monthMap.set(categoryName, { amount, color });
+          }
+          
+          // Track category totals for top selection
+          if (categoryTotals.has(categoryName)) {
+            categoryTotals.get(categoryName)!.total += amount;
+          } else {
+            categoryTotals.set(categoryName, { total: amount, color });
           }
         });
         
-        // Create chart data structure with total spending per month
-        const chartData: MonthlySpendingData[] = Array.from(monthlyData.entries()).map(([month, totalAmount]) => {
-          return {
-            month,
-            total: totalAmount
-          };
+        // Get top X categories by total spending
+        const allSortedCategories = Array.from(categoryTotals.entries())
+          .sort(([,a], [,b]) => b.total - a.total);
+        
+        const categoriesToShow = categoryCount === "all" 
+          ? allSortedCategories 
+          : allSortedCategories.slice(0, parseInt(categoryCount));
+        
+        const topCategories: ChartCategoryData[] = categoriesToShow.map(([name, data]) => ({
+          name,
+          color: data.color,
+          total: data.total
+        }));
+        
+        // Create chart data structure
+        const chartData: MonthlySpendingData[] = Array.from(monthlyData.entries()).map(([month, categoryMap]) => {
+          const monthData: MonthlySpendingData = { month };
+          
+          // Add data for each of the selected top categories
+          topCategories.forEach(category => {
+            const categoryData = categoryMap.get(category.name);
+            monthData[category.name] = categoryData ? categoryData.amount : 0;
+          });
+          
+          return monthData;
         });
         
         // Sort chart data by month chronologically
         chartData.sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
         
         setMonthlyChartData(chartData);
-        setChartCategories([]); // No longer needed for total spending chart
+        setChartCategories(topCategories);
         
         console.log('Monthly chart data:', chartData);
         console.log('Chart categories:', topCategories);
       } else {
         console.error('Monthly chart API returned error:', expenseResponse.error);
+        console.error('Full response:', expenseResponse);
         setMonthlyChartData([]);
         setChartCategories([]);
       }
@@ -863,18 +899,22 @@ export default function Dashboard() {
     fetchSummaryData(dateRange);
     fetchCategorySpending(dateRange);
     fetchMonthlyCategorySpending(dateRange);
-    fetchMonthlyChartData(dateRange);
+    fetchMonthlyChartData(dateRange, selectedCategoryCount);
     fetchTransactions(dateRange, 1, true);
   }, [dateRange]);
 
   // Update chart when category count selection changes
-  // Note: selectedCategoryCount no longer affects chart since we show total spending
+  useEffect(() => {
+    if (dateRange.from && dateRange.to) {
+      fetchMonthlyChartData(dateRange, selectedCategoryCount);
+    }
+  }, [selectedCategoryCount]);
 
   // Update monthly category spending and chart when toggle changes
   useEffect(() => {
     if (dateRange.from && dateRange.to) {
       fetchMonthlyCategorySpending(dateRange);
-      fetchMonthlyChartData(dateRange);
+      fetchMonthlyChartData(dateRange, selectedCategoryCount);
     }
   }, [showOnlyRegularCategories]);
 
@@ -1155,10 +1195,24 @@ export default function Dashboard() {
       {/* Monthly Spending Chart */}
       <Card>
         <CardHeader className="p-3 md:p-6">
-          <CardTitle className="text-sm md:text-lg">
-            <span className="hidden md:inline">Monthly Spending Trends (Total Expenses)</span>
-            <span className="md:hidden">Monthly Spending</span>
-          </CardTitle>
+          <div className="flex flex-col gap-2 md:gap-3 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="text-sm md:text-lg">
+              <span className="hidden md:inline">Monthly Spending Trends (Expenses Only) - {getCategoryDisplayText(selectedCategoryCount)}</span>
+              <span className="md:hidden">Spending Trends</span>
+            </CardTitle>
+            <Select value={selectedCategoryCount} onValueChange={setSelectedCategoryCount}>
+              <SelectTrigger className="w-full md:w-32 text-xs md:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Top 3</SelectItem>
+                <SelectItem value="5">Top 5</SelectItem>
+                <SelectItem value="8">Top 8</SelectItem>
+                <SelectItem value="10">Top 10</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent className="p-0 md:p-6">
           {loading ? (
@@ -1197,8 +1251,41 @@ export default function Dashboard() {
                     width={45}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string) => [`${getCurrencySymbol(baseCurrency)}${value.toFixed(2)}`, name]}
-                    labelFormatter={(label) => `Month: ${label}`}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const total = payload.reduce((sum, entry) => sum + (entry.value as number), 0);
+                        return (
+                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                            <p className="text-sm font-medium mb-2">{`${label}`}</p>
+                            {payload.map((entry, index) => (
+                              entry.value > 0 && (
+                                <div key={index} className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center">
+                                    <div 
+                                      className="w-3 h-3 rounded mr-2" 
+                                      style={{ backgroundColor: entry.color }}
+                                    />
+                                    <span className="text-xs">{entry.dataKey}</span>
+                                  </div>
+                                  <span className="text-xs font-medium">
+                                    {`${getCurrencySymbol(baseCurrency)}${(entry.value as number).toFixed(2)}`}
+                                  </span>
+                                </div>
+                              )
+                            ))}
+                            <div className="border-t border-border pt-2 mt-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Total:</span>
+                                <span className="text-sm font-bold text-primary">
+                                  {`${getCurrencySymbol(baseCurrency)}${total.toFixed(2)}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                     contentStyle={{
                       fontSize: '12px',
                       fontFamily: 'inherit',
@@ -1219,12 +1306,15 @@ export default function Dashboard() {
                     }}
                     iconSize={8}
                   />
-                  <Bar
-                    dataKey="total"
-                    fill="#EF4444"
-                    name="Total Spending"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  {chartCategories.map((category, index) => (
+                    <Bar
+                      key={category.name}
+                      dataKey={category.name}
+                      stackId="spending"
+                      fill={category.color}
+                      name={`${category.name} (${getCurrencySymbol(baseCurrency)}${category.total.toFixed(0)})`}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
