@@ -484,7 +484,7 @@ export default function Dashboard() {
           sum + (t.type === 'expense' ? t.amount : 0), 0);
         const totalCapex = transactions.reduce((sum: number, t: Transaction) => 
           sum + (t.type === 'capex' ? t.amount : 0), 0);
-        const netIncome = totalIncome - totalSpending - totalCapex;
+        const netIncome = totalIncome - totalSpending;
         const savingsRate = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0;
 
         console.log('Calculated totals:', { totalIncome, totalSpending, netIncome, savingsRate });
@@ -509,8 +509,8 @@ export default function Dashboard() {
         totalIncome: 5000,
         totalSpending: 3200,
         totalCapex: 800,
-        netIncome: 1000,
-        savingsRate: 20,
+        netIncome: 1800, // 5000 - 3200 (excluding CAPEX)
+        savingsRate: 36, // (1800 / 5000) * 100
         transactions: []
       });
     } finally {
