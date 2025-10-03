@@ -14,6 +14,7 @@ import { initializeDatabase } from './database/init.js';
 import { authRoutes } from './routes/auth.js';
 import { transactionRoutes } from './routes/transactions.js';
 import { categoryRoutes } from './routes/categories.js';
+import { categoryRulesRoutes } from './routes/categoryRules.js';
 import { analyticsRoutes } from './routes/analytics.js';
 import { settingsRoutes } from './routes/settings.js';
 import { importRoutes } from './routes/import.js';
@@ -110,6 +111,7 @@ app.get('/api/status', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/category-rules', categoryRulesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/settings', settingsRoutes);

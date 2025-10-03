@@ -445,6 +445,19 @@ router.post('/boi-upload', authenticateToken, uploadPdf.single('pdfFile'), async
       [req.userId]
     );
 
+    // Get category rules for intelligent categorization
+    const categoryRules = await getRows(`
+      SELECT 
+        cr.*,
+        c.name as category_name,
+        c.color as category_color,
+        c.icon as category_icon
+      FROM category_rules cr
+      JOIN categories c ON cr.category_id = c.id
+      WHERE cr.user_id = ? OR cr.user_id IS NULL
+      ORDER BY cr.priority DESC, cr.created_at ASC
+    `, [req.userId]);
+
     // Process each transaction and suggest categories
     const validationResults = [];
     for (let i = 0; i < transactions.length; i++) {
@@ -454,7 +467,8 @@ router.post('/boi-upload', authenticateToken, uploadPdf.single('pdfFile'), async
       const suggestedCategory = suggestCategory(
         transaction.description,
         existingCategories,
-        userTransactions
+        userTransactions,
+        categoryRules
       );
 
       // Check for exact duplicates

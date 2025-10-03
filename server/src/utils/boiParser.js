@@ -505,92 +505,54 @@ function cleanDescription(description) {
  * @param {string} description - Transaction description
  * @param {Array} existingCategories - Array of existing categories
  * @param {Array} userTransactions - User's previous transactions for learning
+ * @param {Array} categoryRules - Array of category rules from database
  * @returns {string} Suggested category name
  */
-export function suggestCategory(description, existingCategories = [], userTransactions = []) {
+export function suggestCategory(description, existingCategories = [], userTransactions = [], categoryRules = []) {
   const desc = description.toLowerCase();
   
-  // Handle specific special cases first
-  if (desc.includes('365 online santry cr')) {
-    const rentalIncomeCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'rental income'
-    );
-    if (rentalIncomeCategory) {
-      return rentalIncomeCategory.name;
+  // First, check category rules from database (sorted by priority)
+  if (categoryRules && categoryRules.length > 0) {
+    // Sort rules by priority (highest first)
+    const sortedRules = categoryRules
+      .filter(rule => rule.is_active !== 0) // Only active rules
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    
+    for (const rule of sortedRules) {
+      if (rule.keywords) {
+        const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
+        
+        // Check if any keyword matches the description
+        const hasMatch = keywords.some(keyword => {
+          if (keyword.length === 0) return false;
+          
+          // Handle exact phrase matching (keywords with spaces)
+          if (keyword.includes(' ')) {
+            return desc.includes(keyword);
+          }
+          
+          // Handle word boundary matching for single words
+          const wordBoundaryRegex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+          return wordBoundaryRegex.test(desc);
+        });
+        
+        if (hasMatch) {
+          // Find the category name from existing categories
+          const matchedCategory = existingCategories.find(cat => 
+            cat.id === rule.category_id || cat.name.toLowerCase() === rule.category_name?.toLowerCase()
+          );
+          
+          if (matchedCategory) {
+            return matchedCategory.name;
+          } else if (rule.category_name) {
+            return rule.category_name;
+          }
+        }
+      }
     }
   }
   
-  if (desc.includes('park magic')) {
-    const tollCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'toll'
-    );
-    if (tollCategory) {
-      return tollCategory.name;
-    }
-  }
-  
-  // VHI patterns
-  if (desc.includes('vhi') && desc.includes('pcc sp')) {
-    const doctorCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'doctor'
-    );
-    if (doctorCategory) {
-      return doctorCategory.name;
-    }
-  }
-  
-  if (desc.includes('vhi sepa dd')) {
-    const insuranceCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'insurance'
-    );
-    if (insuranceCategory) {
-      return insuranceCategory.name;
-    }
-  }
-  
-  // Rental income patterns
-  if (desc.includes('temple place') || desc.includes('temple palace') || 
-      desc.includes('santry') || desc.includes('santr') || 
-      desc.includes('henrietta') || desc.includes('henriett')) {
-    const rentalIncomeCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'rental income'
-    );
-    if (rentalIncomeCategory) {
-      return rentalIncomeCategory.name;
-    }
-  }
-  
-  // Child benefit patterns - matches V960358415 followed by date and FA
-  if (desc.includes('v960358415') && desc.includes('fa')) {
-    const childBenefitCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'child benefit'
-    );
-    if (childBenefitCategory) {
-      return childBenefitCategory.name;
-    }
-  }
-  
-  // Coffee pattern
-  if (desc.includes('cloud pic')) {
-    const coffeeCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'coffee'
-    );
-    if (coffeeCategory) {
-      return coffeeCategory.name;
-    }
-  }
-  
-  // Meal patterns
-  if (desc.includes('china tang') || desc.includes('sumup *cat')) {
-    const mealCategory = existingCategories.find(cat => 
-      cat.name.toLowerCase() === 'meal'
-    );
-    if (mealCategory) {
-      return mealCategory.name;
-    }
-  }
-  
-  // First, check if we've seen this exact description before
+  // Fallback: check if we've seen this exact description before
   for (const transaction of userTransactions) {
     if (transaction.description && 
         transaction.description.toLowerCase() === desc && 
@@ -599,7 +561,7 @@ export function suggestCategory(description, existingCategories = [], userTransa
     }
   }
   
-  // Check for partial matches in previous transactions
+  // Fallback: check for partial matches in previous transactions
   for (const transaction of userTransactions) {
     if (transaction.description && transaction.category_name) {
       const transDesc = transaction.description.toLowerCase();
@@ -612,85 +574,6 @@ export function suggestCategory(description, existingCategories = [], userTransa
           (commonWords.length >= 1 && Math.max(words1.length, words2.length) <= 3)) {
         return transaction.category_name;
       }
-    }
-  }
-  
-  // Category mapping based on your existing transaction patterns
-  const categoryMappings = [
-    // Groceries & Food (your most used category)
-    { keywords: ['lidl', 'aldi', 'tesco', 'dunnes', 'supervalu', 'spar', 'corn'], category: 'Supermarket' },
-    { keywords: ['restaurant', 'cafe', 'pizza', 'mcdonald', 'burger', 'kfc', 'coffee'], category: 'Meal' },
-    
-    // Shopping & Furniture
-    { keywords: ['ikea', 'furniture', 'sofa'], category: 'Furniture' },
-    { keywords: ['decathlon', 'sports', 'gym'], category: 'Entertainment' },
-    { keywords: ['clothing', 'shirt', 'fashion'], category: 'Clothing' },
-    { keywords: ['electrical', 'appliances'], category: 'Electrical appliances' },
-    { keywords: ['tools'], category: 'Tools' },
-    { keywords: ['books', 'stationaries'], category: 'Books' },
-    
-    // Transport
-    { keywords: ['dublin airp', 'airport', 'leap card', 'bus', 'dart'], category: 'Transport' },
-    { keywords: ['parking'], category: 'Parking' },
-    { keywords: ['petrol', 'fuel', 'esso', 'shell', 'circle k', 'ev charge'], category: 'Fuel' },
-    { keywords: ['toll'], category: 'Toll' },
-    { keywords: ['car maintenance'], category: 'Car maintenance' },
-    
-    // Travel & Entertainment
-    { keywords: ['travel', 'hotel', 'flight'], category: 'Travel' },
-    { keywords: ['park magic'], category: 'Toll' }, // Specific case for Park Magic toll
-    { keywords: ['cinema', 'movie', 'entertainment'], category: 'Entertainment' },
-    { keywords: ['pga', 'golf'], category: 'Entertainment' }, // PGA golf events are entertainment
-    { keywords: ['ob pga europ'], category: 'Entertainment' }, // Specific PGA event
-    
-    // Bills & Services
-    { keywords: ['vodafone', 'three', 'eir', 'virgin', 'mobile'], category: 'Mobile' },
-    { keywords: ['electric', 'electricity'], category: 'Electricity' },
-    { keywords: ['vhi sepa dd', 'vhi insurance', 'zurich'], category: 'Insurance' },
-    { keywords: ['vhi', 'pcc sp'], category: 'Insurance' }, // VHI refunds/payments
-    { keywords: ['subscription', 'netflix', 'spotify'], category: 'Subscription' },
-    { keywords: ['postal', 'mail'], category: 'Postal' },
-    
-    // Medical & Health
-    { keywords: ['doctor', 'medical', 'health'], category: 'Doctor' },
-    { keywords: ['medicine', 'pharmacy', 'boots'], category: 'Medicine' },
-    
-    // Financial & Banking
-    { keywords: ['fee', 'charge', 'maintaining', 'bank'], category: 'Bank' },
-    { keywords: ['365 online', 'santry'], category: 'Transfer' }, // General 365 Online transfers (after specific patterns)
-    { keywords: ['transfer', 'online'], category: 'Transfer' },
-    
-    // Income patterns
-    { keywords: ['henrietta', 'salary', 'wages'], category: 'Income' },
-    
-    // Property & Rental
-    { keywords: ['rental', 'property', 'rent'], category: 'Rental property' },
-    { keywords: ['garden'], category: 'Garden' },
-    { keywords: ['solar'], category: 'Solar' },
-    
-    // Education
-    { keywords: ['school', 'education'], category: 'School' },
-    
-    // Other
-    { keywords: ['gift'], category: 'Gift' },
-    { keywords: ['donation'], category: 'Donation' },
-    { keywords: ['tax'], category: 'Tax' },
-    { keywords: ['license'], category: 'License' },
-    { keywords: ['maintenance'], category: 'Maintenance' }
-  ];
-  
-  // Find matching category
-  for (const mapping of categoryMappings) {
-    if (mapping.keywords.some(keyword => desc.includes(keyword.toLowerCase()))) {
-      // Check if this category exists in user's categories
-      const existingCategory = existingCategories.find(cat => 
-        cat.name.toLowerCase() === mapping.category.toLowerCase()
-      );
-      if (existingCategory) {
-        return existingCategory.name;
-      }
-      // Return the suggested category name even if it doesn't exist yet
-      return mapping.category;
     }
   }
   

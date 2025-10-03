@@ -1,16 +1,19 @@
 # Spending Finance Tracker
 
-A modern, full-stack finance tracking application with **single-server deployment**, drag-and-drop import, and intelligent category management. Built with React, TypeScript, Express.js, and SQLite.
+A modern, full-stack finance tracking application with **multi-currency support**, **TOTP 2FA security**, **dark mode**, and **single-server deployment**. Features drag-and-drop import, intelligent category management, and fully responsive mobile-optimized UI. Built with React, TypeScript, Express.js, and SQLite.
 
 ## 🎯 Key Features
 
 - **Single-Server Architecture**: Frontend and backend served from one port (3001)
 - **No CORS Issues**: Relative API calls eliminate cross-origin problems
 - **HTTPS Ready**: Works seamlessly with Cloudflare proxy and reverse proxies
+- **Multi-Currency Support**: Track transactions in multiple currencies with automatic conversion
+- **TOTP 2FA Security**: Mobile authenticator app integration (Google Authenticator, Authy, etc.)
+- **Dark Mode**: Full dark mode support with system preference detection
 - **Drag-and-Drop Import**: CSV file upload with intelligent parsing
 - **Smart Categories**: 80+ icons with automatic color assignment
 - **Advanced Analytics**: Monthly trends, spending breakdowns, capital expenditure tracking
-- **Responsive Design**: Mobile-first with modern UI components
+- **Fully Responsive**: Mobile-optimized UI with touch-friendly controls
 
 ## 🏗️ Architecture
 
@@ -130,26 +133,32 @@ sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3001
 
 ## 📋 Application Features
 
-### 🔐 Authentication
+### 🔐 Authentication & Security
 - Email/password registration and login
-- Google OAuth integration (optional)
-- JWT-based authentication
-- Protected routes
+- **TOTP 2FA**: Mobile authenticator app support (Google Authenticator, Authy, Microsoft Authenticator)
+- QR code setup for easy 2FA enrollment
+- JWT-based authentication with secure session management
+- Protected routes with middleware
+- Optional 2FA bypass for development (BYPASS_2FA env variable)
 
 ### 💰 Transaction Management
 - **Three Types**: Income, Expense, Capital Expenditure (Capex)
-- **Inline Editing**: Click-to-edit fields (description, date, source)
+- **Multi-Currency Support**: Track transactions in USD, EUR, GBP, INR, AUD, CAD, JPY, CNY
+- **Currency Conversion**: Automatic exchange rate handling and display
+- **Inline Editing**: Click-to-edit fields (description, date, source, amount)
 - **Smart Categories**: 80+ icons with intelligent color assignment
-- **Advanced Filtering**: Amount ranges, types, date ranges
+- **Advanced Filtering**: Amount ranges, types, date ranges, categories
 - **CSV Import/Export**: Drag-and-drop with source tracking
 - **Lazy Loading**: Performance-optimized for large datasets
 
 ### 📊 Analytics & Dashboard
-- **Flexible Date Ranges**: Calendar picker with presets
-- **Summary Cards**: Income, Spending, Net Income, Savings Rate, Capex
-- **Monthly Trends**: Category spending with pagination
-- **Performance Optimized**: Lazy loading, intersection observers
-- **Responsive Design**: Mobile-first with modern UI
+- **Flexible Date Ranges**: Calendar picker with presets (This Month, Last Month, This Year, etc.)
+- **Summary Cards**: Income, Spending, Net Income, Savings Rate, Capex with trend indicators
+- **Multi-Currency Dashboard**: All amounts displayed in selected currency
+- **Monthly Trends**: Category spending breakdown with pagination
+- **Performance Optimized**: Lazy loading, intersection observers, efficient data fetching
+- **Dark Mode**: Full dark theme with automatic system detection
+- **Fully Responsive**: Touch-optimized mobile interface with collapsible sidebar
 
 ### 🗂️ Category Management
 - **Custom Categories**: Create with icons and colors
@@ -169,10 +178,12 @@ sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3001
 
 ### Backend
 - **Express.js** with ES modules
-- **SQLite3** database
-- **JWT** authentication
-- **Passport.js** for OAuth
-- **Helmet.js** for security
+- **SQLite3** database with migrations
+- **JWT** authentication with 2FA support
+- **Speakeasy** for TOTP 2FA
+- **bcryptjs** for password hashing
+- **Helmet.js** for security headers
+- **express-validator** for input validation
 
 ### Development
 - **ESLint** + **Prettier**
@@ -192,10 +203,8 @@ HOST=0.0.0.0
 JWT_SECRET=your_jwt_secret_here
 SESSION_SECRET=your_session_secret_here
 
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
+# 2FA Configuration
+BYPASS_2FA=false  # Set to 'true' for development to skip 2FA
 
 # Database
 DATABASE_PATH=./data/spending.db
@@ -232,24 +241,28 @@ npm run logs           # ./scripts/app.sh logs
 ## 🗄️ Database
 
 **SQLite** with automatic migrations:
-- **users**: Authentication and profiles
+- **users**: Authentication, profiles, and TOTP 2FA secrets
 - **categories**: Icons, colors, and metadata
-- **transactions**: Financial data with source tracking
+- **transactions**: Financial data with multi-currency support and source tracking
 
 Features:
 - Automatic schema migrations
+- Multi-currency transaction support (currency and converted amounts)
+- TOTP secret storage for 2FA
 - Source field for transaction origins
 - Optimized indexing for performance
 - Data integrity with foreign keys
 
 ## 🔒 Security
 
-- **JWT Authentication**: Secure token-based auth
-- **Password Hashing**: bcrypt for secure storage
+- **TOTP 2FA**: Time-based one-time passwords with mobile authenticator apps
+- **JWT Authentication**: Secure token-based auth with two-stage verification
+- **Password Hashing**: bcrypt with salt rounds for secure storage
 - **CORS Protection**: Configured allowed origins
 - **Security Headers**: Helmet.js protection
-- **Input Validation**: Server-side validation
+- **Input Validation**: Server-side validation with express-validator
 - **Environment Variables**: Sensitive data protection
+- **Secure Session Management**: 7-day JWT tokens with automatic refresh
 
 ## 🚀 Deployment Benefits
 

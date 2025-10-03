@@ -187,6 +187,35 @@ class ApiClient {
     });
   }
 
+  // Category Rules endpoints
+  async getCategoryRules() {
+    return this.request('/category-rules');
+  }
+
+  async getCategoryRule(id) {
+    return this.request(`/category-rules/${id}`);
+  }
+
+  async createCategoryRule(ruleData) {
+    return this.request('/category-rules', {
+      method: 'POST',
+      body: JSON.stringify(ruleData),
+    });
+  }
+
+  async updateCategoryRule(id, ruleData) {
+    return this.request(`/category-rules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(ruleData),
+    });
+  }
+
+  async deleteCategoryRule(id) {
+    return this.request(`/category-rules/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Analytics endpoints
   async getSummary(params = {}) {
     const queryString = new URLSearchParams(params).toString();
