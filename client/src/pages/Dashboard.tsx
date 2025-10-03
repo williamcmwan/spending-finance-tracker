@@ -777,7 +777,7 @@ export default function Dashboard() {
     }
   };
 
-  const fetchMonthlyChartData = async (range: { from: Date; to: Date }, categoryCount: string = "5") => {
+  const fetchMonthlyChartData = async (range: { from: Date; to: Date }) => {
     try {
       const { start, end } = getDateRange(range);
       
@@ -789,9 +789,8 @@ export default function Dashboard() {
       if (expenseResponse.transactions) {
         const transactions = expenseResponse.transactions || [];
         
-        // Group transactions by month and category
-        const monthlyData = new Map<string, Map<string, { amount: number; color: string }>>();
-        const categoryTotals = new Map<string, { total: number; color: string }>();
+        // Group transactions by month
+        const monthlyData = new Map<string, number>();
         
         transactions.forEach((transaction: Transaction) => {
           // Explicitly exclude capex transactions
@@ -799,63 +798,35 @@ export default function Dashboard() {
             return;
           }
           
+          // Filter out once-off categories if toggle is enabled (consistent with table)
+          if (showOnlyRegularCategories && transaction.category_is_once_off) {
+            return;
+          }
+          
           const monthKey = format(new Date(transaction.date), 'MMM yyyy');
-          const categoryName = transaction.category_name || 'Uncategorized';
           const amount = transaction.amount;
-          const color = getCategoryColor(transaction.category_color, true);
           
-          // Track monthly data
-          if (!monthlyData.has(monthKey)) {
-            monthlyData.set(monthKey, new Map());
-          }
-          const monthMap = monthlyData.get(monthKey)!;
-          
-          if (monthMap.has(categoryName)) {
-            monthMap.get(categoryName)!.amount += amount;
+          // Track monthly totals
+          if (monthlyData.has(monthKey)) {
+            monthlyData.set(monthKey, monthlyData.get(monthKey)! + amount);
           } else {
-            monthMap.set(categoryName, { amount, color });
-          }
-          
-          // Track category totals for top 10 selection
-          if (categoryTotals.has(categoryName)) {
-            categoryTotals.get(categoryName)!.total += amount;
-          } else {
-            categoryTotals.set(categoryName, { total: amount, color });
+            monthlyData.set(monthKey, amount);
           }
         });
         
-        // Get top X categories by total spending
-        const allSortedCategories = Array.from(categoryTotals.entries())
-          .sort(([,a], [,b]) => b.total - a.total);
-        
-        const categoriesToShow = categoryCount === "all" 
-          ? allSortedCategories 
-          : allSortedCategories.slice(0, parseInt(categoryCount));
-        
-        const topCategories: ChartCategoryData[] = categoriesToShow.map(([name, data]) => ({
-          name,
-          color: data.color,
-          total: data.total
-        }));
-        
-        // Create chart data structure
-        const chartData: MonthlySpendingData[] = Array.from(monthlyData.entries()).map(([month, categoryMap]) => {
-          const monthData: MonthlySpendingData = { month };
-          
-          // Add data for each of the selected top categories
-          topCategories.forEach(category => {
-            const categoryData = categoryMap.get(category.name);
-            monthData[category.name] = categoryData ? categoryData.amount : 0;
-          });
-          
-          return monthData;
+        // Create chart data structure with total spending per month
+        const chartData: MonthlySpendingData[] = Array.from(monthlyData.entries()).map(([month, totalAmount]) => {
+          return {
+            month,
+            total: totalAmount
+          };
         });
         
         // Sort chart data by month chronologically
         chartData.sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
         
         setMonthlyChartData(chartData);
-        setChartCategories(topCategories);
+        setChartCategories([]); // No longer needed for total spending chart
         
         console.log('Monthly chart data:', chartData);
         console.log('Chart categories:', topCategories);
@@ -892,21 +863,18 @@ export default function Dashboard() {
     fetchSummaryData(dateRange);
     fetchCategorySpending(dateRange);
     fetchMonthlyCategorySpending(dateRange);
-    fetchMonthlyChartData(dateRange, selectedCategoryCount);
+    fetchMonthlyChartData(dateRange);
     fetchTransactions(dateRange, 1, true);
   }, [dateRange]);
 
   // Update chart when category count selection changes
-  useEffect(() => {
-    if (dateRange.from && dateRange.to) {
-      fetchMonthlyChartData(dateRange, selectedCategoryCount);
-    }
-  }, [selectedCategoryCount]);
+  // Note: selectedCategoryCount no longer affects chart since we show total spending
 
-  // Update monthly category spending when toggle changes
+  // Update monthly category spending and chart when toggle changes
   useEffect(() => {
     if (dateRange.from && dateRange.to) {
       fetchMonthlyCategorySpending(dateRange);
+      fetchMonthlyChartData(dateRange);
     }
   }, [showOnlyRegularCategories]);
 
@@ -1187,24 +1155,10 @@ export default function Dashboard() {
       {/* Monthly Spending Chart */}
       <Card>
         <CardHeader className="p-3 md:p-6">
-          <div className="flex flex-col gap-2 md:gap-3 md:flex-row md:items-center md:justify-between">
-            <CardTitle className="text-sm md:text-lg">
-              <span className="hidden md:inline">Monthly Spending Trends (Expenses Only) - {getCategoryDisplayText(selectedCategoryCount)}</span>
-              <span className="md:hidden">Spending Trends</span>
-            </CardTitle>
-            <Select value={selectedCategoryCount} onValueChange={setSelectedCategoryCount}>
-              <SelectTrigger className="w-full md:w-32 text-xs md:text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3">Top 3</SelectItem>
-                <SelectItem value="5">Top 5</SelectItem>
-                <SelectItem value="8">Top 8</SelectItem>
-                <SelectItem value="10">Top 10</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <CardTitle className="text-sm md:text-lg">
+            <span className="hidden md:inline">Monthly Spending Trends (Total Expenses)</span>
+            <span className="md:hidden">Monthly Spending</span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0 md:p-6">
           {loading ? (
@@ -1265,15 +1219,12 @@ export default function Dashboard() {
                     }}
                     iconSize={8}
                   />
-                  {chartCategories.map((category, index) => (
-                    <Bar
-                      key={category.name}
-                      dataKey={category.name}
-                      stackId="spending"
-                      fill={category.color}
-                      name={`${category.name} (${getCurrencySymbol(baseCurrency)}${category.total.toFixed(0)})`}
-                    />
-                  ))}
+                  <Bar
+                    dataKey="total"
+                    fill="#EF4444"
+                    name="Total Spending"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
