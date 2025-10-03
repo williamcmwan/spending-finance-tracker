@@ -39,10 +39,10 @@ router.get('/summary', authenticateToken, async (req, res) => {
       params.push(end_date);
     }
 
-    // Get total income and expenses
+    // Get total income and expenses (exclude Bank-in from income calculation)
     const summary = await getRow(`
       SELECT 
-        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as total_income,
+        SUM(CASE WHEN type = 'income' AND category_id NOT IN (SELECT id FROM categories WHERE name = 'Bank-in') THEN amount ELSE 0 END) as total_income,
         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as total_expenses,
         COUNT(*) as total_transactions
       FROM transactions 

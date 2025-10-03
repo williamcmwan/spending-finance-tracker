@@ -479,7 +479,7 @@ export default function Dashboard() {
         console.log('Transactions found for summary:', transactions.length);
         
         const totalIncome = transactions.reduce((sum: number, t: Transaction) => 
-          sum + (t.type === 'income' ? t.amount : 0), 0);
+          sum + (t.type === 'income' && t.category_name !== 'Bank-in' ? t.amount : 0), 0);
         const totalSpending = transactions.reduce((sum: number, t: Transaction) => 
           sum + (t.type === 'expense' ? t.amount : 0), 0);
         const totalCapex = transactions.reduce((sum: number, t: Transaction) => 
