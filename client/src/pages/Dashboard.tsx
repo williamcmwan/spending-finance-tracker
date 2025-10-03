@@ -1526,7 +1526,7 @@ export default function Dashboard() {
               <Table>
                 <TableHeader>
                   <TableRow className="h-10">
-                    <TableHead className="w-12 md:w-20 text-xs md:text-sm px-1 md:px-4">Date</TableHead>
+                    <TableHead className="w-16 md:w-24 text-xs md:text-sm px-1 md:px-4">Date</TableHead>
                     <TableHead className="text-xs md:text-sm px-2 md:px-4">Description</TableHead>
                     <TableHead className="w-20 md:w-32 text-xs md:text-sm px-1 md:px-4 hidden sm:table-cell">Category</TableHead>
                     <TableHead className="w-20 md:w-24 text-xs md:text-sm px-1 md:px-4 hidden lg:table-cell">Source</TableHead>
@@ -1544,8 +1544,8 @@ export default function Dashboard() {
                         ref={isLast ? lastTransactionElementRef : null}
                       >
                         <TableCell className="text-muted-foreground text-xs md:text-sm py-2 px-1 md:px-4 align-top">
-                          <div className="hidden md:block">{transaction.date}</div>
-                          <div className="md:hidden text-xs">{format(new Date(transaction.date), 'MM/dd')}</div>
+                          <div className="hidden md:block whitespace-nowrap">{format(new Date(transaction.date), 'MMM dd')}</div>
+                          <div className="md:hidden text-xs whitespace-nowrap">{format(new Date(transaction.date), 'MM/dd')}</div>
                         </TableCell>
                         <TableCell className="py-2 px-2 md:px-4 align-top">
                           <div className="flex flex-col gap-1">
